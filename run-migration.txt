@@ -1,0 +1,40 @@
+USER MIGRATION - BROWSER CONSOLE COMMAND
+=========================================
+
+1. Go to your live app: https://thru-user-app29082025-master-l02sglt1u-keval65-modals-projects.vercel.app
+
+2. Open Developer Console (F12 or right-click → Inspect → Console)
+
+3. Copy and paste this entire command:
+
+```javascript
+(async function migrateUsers() {
+  console.log('🚀 Starting User Migration...');
+  try {
+    const usersRef = firebase.firestore().collection('users');
+    const usersSnapshot = await usersRef.get();
+    console.log(`Found ${usersSnapshot.size} users to check`);
+    
+    let updatedCount = 0;
+    for (const userDoc of usersSnapshot.docs) {
+      const userData = userDoc.data();
+      if (!userData.displayName) {
+        const displayName = `${userData.profileData.name},${userData.profileData.phoneNumber}`;
+        await userDoc.ref.update({ displayName });
+        console.log(`✅ Updated: ${displayName}`);
+        updatedCount++;
+      }
+    }
+    console.log(`🎉 Migration complete! Updated ${updatedCount} users.`);
+  } catch (error) {
+    console.error('❌ Migration failed:', error);
+  }
+})();
+```
+
+4. Press Enter to run the migration
+
+5. Check the console output for results
+
+⚠️  Make sure you're on your live app and Firebase is loaded!
+

@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>User Migration Tool</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        .button:hover {
+            background: #0056b3;
+        }
+        .button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .info { color: #17a2b8; }
+        .warning { color: #ffc107; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔄 User Migration Tool</h1>
+        <p>This tool will update all existing users in your Firebase database to include the new <code>displayName</code> field.</p>
+        
+        <div class="warning">
+            <strong>⚠️ Important:</strong> Make sure you're logged into your Firebase project and have the correct Firebase config loaded.
+        </div>
+        
+        <button id="migrateBtn" class="button">Start Migration</button>
+        <button id="clearBtn" class="button" style="background: #6c757d;">Clear Log</button>
+        
+        <div id="log" class="log"></div>
+    </div>
+
+    <script type="module">
+        // You'll need to replace this with your actual Firebase config
+        const firebaseConfig = {
+            // Add your Firebase config here
+            apiKey: "your-api-key",
+            authDomain: "your-project.firebaseapp.com",
+            projectId: "your-project-id",
+            storageBucket: "your-project.appspot.com",
+            messagingSenderId: "123456789",
+            appId: "your-app-id"
+        };
+
+        // Import Firebase (you'll need to load Firebase SDK first)
+        // For this to work, you need to include Firebase SDK in your HTML
+        // <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
+        // <script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js"></script>
+
+        const log = document.getElementById('log');
+        const migrateBtn = document.getElementById('migrateBtn');
+        const clearBtn = document.getElementById('clearBtn');
+
+        function addLog(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            log.appendChild(div);
+            log.scrollTop = log.scrollHeight;
+        }
+
+        clearBtn.addEventListener('click', () => {
+            log.innerHTML = '';
+        });
+
+        migrateBtn.addEventListener('click', async () => {
+            migrateBtn.disabled = true;
+            migrateBtn.textContent = 'Running Migration...';
+            
+            addLog('🚀 Starting user migration...', 'info');
+            
+            try {
+                // Check if Firebase is available
+                if (typeof firebase === 'undefined') {
+                    throw new Error('Firebase SDK not loaded. Please include Firebase scripts in your HTML.');
+                }
+                
+                // Initialize Firebase
+                const app = firebase.initializeApp(firebaseConfig);
+                const db = firebase.firestore();
+                
+                addLog('📊 Fetching users from database...', 'info');
+                
+                // Get all users
+                const usersSnapshot = await db.collection('users').get();
+                addLog(`Found ${usersSnapshot.size} users to check`, 'info');
+                
+                let updatedCount = 0;
+                const errors = [];
+                
+                // Process each user
+                for (const userDoc of usersSnapshot.docs) {
+                    try {
+                        const userData = userDoc.data();
+                        
+                        // Skip if displayName already exists
+                        if (userData.displayName) {
+                            addLog(`✅ User ${userDoc.id} already has displayName: ${userData.displayName}`, 'success');
+                            continue;
+                        }
+                        
+                        // Create displayName from existing profileData
+                        const displayName = `${userData.profileData.name},${userData.profileData.phoneNumber}`;
+                        
+                        // Update the user document with displayName
+                        await userDoc.ref.update({
+                            displayName: displayName
+                        });
+                        
+                        addLog(`🔄 Updated user ${userDoc.id} with displayName: ${displayName}`, 'success');
+                        updatedCount++;
+                        
+                    } catch (error) {
+                        const errorMsg = `❌ Failed to update user ${userDoc.id}: ${error.message}`;
+                        addLog(errorMsg, 'error');
+                        errors.push(errorMsg);
+                    }
+                }
+                
+                addLog(`\n📈 Migration Summary:`, 'info');
+                addLog(`✅ Successfully updated: ${updatedCount} users`, 'success');
+                addLog(`❌ Errors: ${errors.length}`, errors.length > 0 ? 'error' : 'info');
+                
+                if (errors.length > 0) {
+                    addLog('\n🚨 Errors encountered:', 'error');
+                    errors.forEach(error => addLog(`  - ${error}`, 'error'));
+                }
+                
+                addLog('\n🎉 Migration completed!', 'success');
+                
+            } catch (error) {
+                addLog(`💥 Migration failed: ${error.message}`, 'error');
+            } finally {
+                migrateBtn.disabled = false;
+                migrateBtn.textContent = 'Start Migration';
+            }
+        });
+
+        addLog('Migration tool ready. Click "Start Migration" to begin.', 'info');
+    </script>
+</body>
+</html>
+
