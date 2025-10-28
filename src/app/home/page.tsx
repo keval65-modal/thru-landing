@@ -40,6 +40,7 @@ import { VendorOffersDisplay } from "@/components/VendorOffersDisplay";
 import { DynamicProduct } from "@/lib/scalable-grocery-ai-service";
 import { purchasePatternTracker } from "@/lib/purchase-pattern-tracker";
 import { VendorRequestPayload, AggregatedItemOffer } from "@/types/vendor-requests";
+import { enhancedOrderService } from "@/lib/enhanced-order-service";
 
 function HomePageContent() {
   const router = useRouter();
@@ -86,6 +87,8 @@ function HomePageContent() {
   const [cuisineFilter, setCuisineFilter] = React.useState<string>("all");
   const [costFilter, setCostFilter] = React.useState<string>("all");
   const [prepTimeFilter, setPrepTimeFilter] = React.useState<string>("all");
+  const [foodShops, setFoodShops] = React.useState<any[]>([]);
+  const [loadingFoodShops, setLoadingFoodShops] = React.useState(false);
 
   // Google Maps states
   const [isGoogleMapsScriptLoaded, setIsGoogleMapsScriptLoaded] = React.useState(false);
@@ -684,6 +687,64 @@ function HomePageContent() {
       description: "Your purchase patterns have been updated for better recommendations.",
     });
   };
+
+  // Load food shops along route
+  const loadFoodShops = React.useCallback(async () => {
+    if (!selectedStartLocation || !selectedDestination) {
+      return;
+    }
+
+    setLoadingFoodShops(true);
+    try {
+      // Get coordinates from selected locations
+      const startDetails = await getPlaceDetails(selectedStartLocation);
+      const destDetails = await getPlaceDetails(selectedDestination);
+
+      if (!startDetails || !destDetails) {
+        console.error('Could not get place details');
+        return;
+      }
+
+      const startCoords = (startDetails as any).coordinates;
+      const destCoords = (destDetails as any).coordinates;
+
+      console.log('🍽️ Finding food shops along route:', { startCoords, destCoords });
+
+      // Use enhanced order service to find food shops
+      const shops = await enhancedOrderService.findShopsAlongRoute(
+        { latitude: startCoords.lat, longitude: startCoords.lng },
+        { latitude: destCoords.lat, longitude: destCoords.lng },
+        maxDetourKm,
+        ['restaurant', 'cafe', 'cloud_kitchen', 'bakery', 'fast_food', 'fine_dining', 'food_truck', 'coffee_shop', 'bar', 'pub']
+      );
+
+      console.log(`✅ Found ${shops.length} food shops`);
+      setFoodShops(shops);
+
+      if (shops.length > 0) {
+        toast({
+          title: "Food Shops Found!",
+          description: `Discovered ${shops.length} food outlet${shops.length > 1 ? 's' : ''} along your route.`,
+        });
+      }
+    } catch (error) {
+      console.error('Error loading food shops:', error);
+      toast({
+        title: "Error",
+        description: "Could not load food shops. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingFoodShops(false);
+    }
+  }, [selectedStartLocation, selectedDestination, maxDetourKm, toast]);
+
+  // Load food shops when route changes or when food tab becomes active
+  React.useEffect(() => {
+    if (activeTab === 'food' && selectedStartLocation && selectedDestination) {
+      loadFoodShops();
+    }
+  }, [activeTab, selectedStartLocation, selectedDestination, loadFoodShops]);
 
   // Handle adding route stops
   const addRouteStop = async (suggestion?: typeof stopSuggestions[0]) => {
@@ -1416,14 +1477,84 @@ function HomePageContent() {
                       </div>
                     </div>
 
-                    {/* Placeholder for food results */}
-                    <div className="text-center py-8">
-                      <Utensils className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-                      <p className="text-muted-foreground">Food discovery features coming soon!</p>
-                      <p className="text-sm text-muted-foreground mt-2">
-                        We'll show you the best food options based on your route and selected filters.
-                      </p>
-                    </div>
+                    {/* Food Shop Results */}
+                    {loadingFoodShops ? (
+                      <div className="text-center py-8">
+                        <Loader2 className="h-12 w-12 mx-auto mb-4 text-primary animate-spin" />
+                        <p className="text-muted-foreground">Discovering food shops along your route...</p>
+                      </div>
+                    ) : foodShops.length > 0 ? (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="font-medium">Found {foodShops.length} Food Outlets</h4>
+                          <Button variant="outline" size="sm" onClick={loadFoodShops}>
+                            <Search className="h-4 w-4 mr-2" />
+                            Refresh
+                          </Button>
+                        </div>
+                        {foodShops.map((shop, index) => (
+                          <Card key={shop.id || index} className="p-4 hover:shadow-md transition-shadow">
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <h5 className="font-semibold text-lg">{shop.name}</h5>
+                                  <Badge variant="outline" className="text-xs">
+                                    {shop.type}
+                                  </Badge>
+                                </div>
+                                <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
+                                  <MapPin className="h-3 w-3" />
+                                  {shop.address}
+                                </p>
+                                {shop.detourDistance && (
+                                  <p className="text-xs text-muted-foreground">
+                                    📍 {shop.detourDistance.toFixed(1)} km detour
+                                  </p>
+                                )}
+                                {shop.rating && (
+                                  <div className="flex items-center gap-1 mt-2">
+                                    <span className="text-yellow-500">⭐</span>
+                                    <span className="text-sm font-medium">{shop.rating}</span>
+                                  </div>
+                                )}
+                              </div>
+                              <Button size="sm" className="ml-4">
+                                <Utensils className="h-4 w-4 mr-2" />
+                                View Menu
+                              </Button>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-8">
+                        <Utensils className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+                        {selectedStartLocation && selectedDestination ? (
+                          <>
+                            <p className="text-muted-foreground">No food outlets found along your route</p>
+                            <p className="text-sm text-muted-foreground mt-2">
+                              Try adjusting your route or increasing the detour distance
+                            </p>
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              onClick={loadFoodShops}
+                              className="mt-4"
+                            >
+                              <Search className="h-4 w-4 mr-2" />
+                              Search Again
+                            </Button>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-muted-foreground">Plan your route first</p>
+                            <p className="text-sm text-muted-foreground mt-2">
+                              Enter your start location and destination above to discover food options along your way
+                            </p>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </Card>
                 </TabsContent>
 
