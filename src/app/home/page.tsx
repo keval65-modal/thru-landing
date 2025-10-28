@@ -707,13 +707,15 @@ function HomePageContent() {
 
       const startCoords = (startDetails as any).coordinates;
       const destCoords = (destDetails as any).coordinates;
+      const startAddress = (startDetails as any).address || startLocationQuery;
+      const destAddress = (destDetails as any).address || destinationQuery;
 
       console.log('🍽️ Finding food shops along route:', { startCoords, destCoords });
 
       // Use enhanced order service to find food shops
       const shops = await enhancedOrderService.findShopsAlongRoute(
-        { latitude: startCoords.lat, longitude: startCoords.lng },
-        { latitude: destCoords.lat, longitude: destCoords.lng },
+        { latitude: startCoords.lat, longitude: startCoords.lng, address: startAddress },
+        { latitude: destCoords.lat, longitude: destCoords.lng, address: destAddress },
         maxDetourKm,
         ['restaurant', 'cafe', 'cloud_kitchen', 'bakery', 'fast_food', 'fine_dining', 'food_truck', 'coffee_shop', 'bar', 'pub']
       );
