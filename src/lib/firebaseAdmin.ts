@@ -4,7 +4,7 @@ import { getFirestore } from 'firebase-admin/firestore';
 
 let adminApp: App | null = null;
 
-export function getAdminApp(): App {
+export function getAdminApp(): App | null {
   if (adminApp) return adminApp;
 
   const projectId = process.env.FIREBASE_PROJECT_ID;
@@ -12,12 +12,14 @@ export function getAdminApp(): App {
   let privateKey = process.env.FIREBASE_PRIVATE_KEY;
 
   if (!projectId || !clientEmail || !privateKey) {
-    const missing = [
-      !projectId ? 'FIREBASE_PROJECT_ID' : undefined,
-      !clientEmail ? 'FIREBASE_CLIENT_EMAIL' : undefined,
-      !privateKey ? 'FIREBASE_PRIVATE_KEY' : undefined,
-    ].filter(Boolean).join(', ');
-    throw new Error(`Missing Firebase Admin credentials: ${missing}`);
+    console.warn('Firebase Admin credentials not available - returning null');
+    return null;
+  }
+
+  // Skip Firebase Admin initialization during build
+  if (process.env.NODE_ENV === 'production' && !projectId) {
+    console.warn('Skipping Firebase Admin initialization during build');
+    return null;
   }
 
   // Normalize private key for both multiline and \n-escaped formats
@@ -39,8 +41,15 @@ export function getAdminApp(): App {
   return adminApp;
 }
 
-export const adminAuth = () => getAuth(getAdminApp());
-export const adminDb = () => getFirestore(getAdminApp());
+export const adminAuth = () => {
+  const app = getAdminApp();
+  return app ? getAuth(app) : null;
+};
+
+export const adminDb = () => {
+  const app = getAdminApp();
+  return app ? getFirestore(app) : null;
+};
 
 
 

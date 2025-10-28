@@ -381,7 +381,48 @@ function PlanTripStep5PageContent() {
       
       await setDoc(doc(db, "orders", orderId), newOrder);
       console.log("Order saved to Firestore with ID:", orderId);
-      toast({ title: "Order Placed Successfully!", description: `Order ID #${orderId}. Preparing route...`, duration: 3000 });
+      
+      // Send order to vendor app using the new service
+      const vendorOrderService = new (await import('@/lib/vendor-order-service')).default();
+      const transformedOrderData = vendorOrderService.transformOrderForVendor({
+        id: orderId,
+        userId: (newOrder as any).userId || 'unknown_user',
+        items: (newOrder as any).items || [],
+        route: {
+          startLocation: (newOrder as any).startLocation,
+          endLocation: (newOrder as any).destination,
+          departureTime: (newOrder as any).createdAt || new Date().toISOString()
+        },
+        detourPreferences: {
+          maxDetourKm: 5,
+          maxDetourMinutes: 15
+        },
+        createdAt: (newOrder as any).createdAt || new Date().toISOString(),
+        totalAmount: (newOrder as any).totalAmount,
+        paymentStatus: 'pending'
+      });
+
+      console.log('🚀 Sending order to vendor app...');
+      const vendorResult = await vendorOrderService.sendOrderToVendorApp(transformedOrderData);
+
+      if (vendorResult.success) {
+        console.log('✅ Order sent to vendor app successfully');
+      } else {
+        console.warn('⚠️ Failed to send order to vendor app:', vendorResult.error);
+      }
+
+      // Send FCM notifications as backup
+      const fcmService = new (await import('@/lib/fcm-service')).FCMService();
+      for (const vendorId of vendorIdsInOrder) {
+        try {
+          await fcmService.sendVendorNotification(vendorId, orderId, newOrder);
+          console.log(`FCM notification sent to vendor: ${vendorId}`);
+        } catch (error) {
+          console.error(`Failed to send FCM notification to vendor ${vendorId}:`, error);
+        }
+      }
+      
+      toast({ title: "Order Placed Successfully!", description: `Order ID #${orderId}. Notifications sent to vendors...`, duration: 3000 });
 
       const queryParams = new URLSearchParams();
       if (startLocation) queryParams.set("start", startLocation);

@@ -1,10 +1,13 @@
-
 "use client";
 
 import Image from 'next/image';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { CarFront, ShoppingCart, MapPin, Package, ArrowRight, GitFork } from 'lucide-react';
+
+// Only show test components in development
+const isDevelopment = process.env.NODE_ENV === 'development';
+const GroceryOrderFlowTest = isDevelopment ? require('@/components/GroceryOrderFlowTest').default : null;
 
 export default function LandingPage() {
 
@@ -141,6 +144,48 @@ export default function LandingPage() {
             </div>
           </div>
         </section>
+
+      {/* Test sections - only visible in development */}
+      {isDevelopment && (
+        <>
+          {/* V4 Test Vendor Management */}
+          <section className="py-16 bg-blue-50">
+            <div className="container">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold mb-4">V4 Test Vendor Management</h2>
+                <p className="text-muted-foreground">Clean, comprehensive test vendor management for V4 deployment</p>
+                <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm bg-amber-100 text-amber-800">
+                  <span className="w-2 h-2 bg-amber-500 rounded-full mr-2"></span>
+                  Development Mode Only
+                </div>
+              </div>
+              <div className="text-center">
+                <Link href="/test-vendors-v4">
+                  <Button size="lg" className="bg-blue-600 hover:bg-blue-700">
+                    Manage V4 Test Vendors
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </section>
+
+          {/* Grocery Order Flow Test - V4 Integration */}
+          <section className="py-16 bg-gray-50">
+            <div className="container">
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold mb-4">Grocery Order Flow Test - V4</h2>
+                <p className="text-muted-foreground">Testing the V4 vendor integration flow: Order → Vendor Response → Selection</p>
+                <div className="mt-2 inline-flex items-center px-3 py-1 rounded-full text-sm bg-amber-100 text-amber-800">
+                  <span className="w-2 h-2 bg-amber-500 rounded-full mr-2"></span>
+                  Development Mode Only
+                </div>
+              </div>
+              {GroceryOrderFlowTest && <GroceryOrderFlowTest />}
+            </div>
+          </section>
+        </>
+      )}
       </main>
 
       {/* Footer */}

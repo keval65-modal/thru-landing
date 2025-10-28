@@ -49,6 +49,8 @@ const nextConfig: NextConfig = {
       fs: false,
       net: false,
       tls: false,
+      '@opentelemetry/exporter-jaeger': false,
+      'handlebars': false,
     };
 
     // Exclude problematic modules from client bundle

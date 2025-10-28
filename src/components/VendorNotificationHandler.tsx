@@ -7,14 +7,14 @@ import { Bell, CheckCircle, XCircle, Clock, AlertTriangle, Phone } from 'lucide-
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { VendorResponse } from '@/types/grocery-advanced'
+import { VendorResponse } from '@/lib/vendor-response-handler'
 import { Timestamp } from 'firebase/firestore'
 
 interface VendorNotificationHandlerProps {
   orderId: string
   onVendorResponse: (response: VendorResponse) => void
-  onOrderAccepted: (shopId: string) => void
-  onOrderRejected: (shopId: string, reason: string) => void
+  onOrderAccepted: (vendorId: string) => void
+  onOrderRejected: (vendorId: string, reason: string) => void
 }
 
 export default function VendorNotificationHandler({ 
@@ -58,12 +58,12 @@ export default function VendorNotificationHandler({
     onVendorResponse(response)
 
     if (response.status === 'accepted') {
-      setAcceptedVendor(response.shopId)
+      setAcceptedVendor(response.vendorId)
       setIsWaitingForResponse(false)
-      onOrderAccepted(response.shopId)
+      onOrderAccepted(response.vendorId)
     } else if (response.status === 'rejected') {
-      setRejectedVendors(prev => [...prev, response.shopId])
-      onOrderRejected(response.shopId, response.notes || 'No reason provided')
+      setRejectedVendors(prev => [...prev, response.vendorId])
+      onOrderRejected(response.vendorId, response.notes || 'No reason provided')
     }
   }
 
@@ -73,25 +73,19 @@ export default function VendorNotificationHandler({
       // Simulate random vendor responses
       const responses = [
         {
-          shopId: 'shop1',
           orderId,
-          responseTime: 45000, // 45 seconds
+          vendorId: 'shop1',
           status: 'accepted' as const,
-          availableItems: [],
-          missingItems: [],
-          estimatedPreparationTime: 20,
           notes: 'Order accepted, will be ready in 20 minutes',
+          estimatedReadyTime: Date.now() + 20 * 60 * 1000, // 20 minutes from now
           respondedAt: Timestamp.now()
         },
         {
-          shopId: 'shop2',
           orderId,
-          responseTime: 60000, // 1 minute
+          vendorId: 'shop2',
           status: 'rejected' as const,
-          availableItems: [],
-          missingItems: ['item1', 'item2'],
-          estimatedPreparationTime: 0,
           notes: 'Some items not available',
+          estimatedReadyTime: undefined,
           respondedAt: Timestamp.now()
         }
       ]
@@ -189,19 +183,16 @@ export default function VendorNotificationHandler({
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                       {getResponseIcon(response.status)}
-                      <span className="font-medium">Shop {response.shopId}</span>
+                      <span className="font-medium">Shop {response.vendorId}</span>
                     </div>
                     <Badge className={getResponseColor(response.status)}>
                       {response.status.toUpperCase()}
                     </Badge>
                   </div>
                   
-                  <div className="grid grid-cols-2 gap-4 text-sm text-gray-600">
+                  <div className="text-sm text-gray-600">
                     <div>
-                      <span className="font-medium">Response Time:</span> {response.responseTime}s
-                    </div>
-                    <div>
-                      <span className="font-medium">Prep Time:</span> {response.estimatedPreparationTime} min
+                      <span className="font-medium">Estimated Ready Time:</span> {response.estimatedReadyTime ? new Date(response.estimatedReadyTime).toLocaleTimeString() : 'Not specified'}
                     </div>
                   </div>
                   
@@ -209,12 +200,6 @@ export default function VendorNotificationHandler({
                     <p className="text-sm text-gray-600 mt-2">{response.notes}</p>
                   )}
                   
-                  {response.missingItems.length > 0 && (
-                    <div className="mt-2">
-                      <p className="text-sm font-medium text-red-600">Missing Items:</p>
-                      <p className="text-sm text-red-500">{response.missingItems.join(', ')}</p>
-                    </div>
-                  )}
                 </div>
               ))}
             </div>

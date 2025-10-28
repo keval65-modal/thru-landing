@@ -63,7 +63,7 @@ export class GroceryAPI {
   private baseUrl: string
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_VENDOR_API_URL || ''
+    this.baseUrl = process.env.NEXT_PUBLIC_VENDOR_API_URL || 'https://merchant.kiptech.in/api'
   }
 
   async searchProducts(searchTerm: string, limit: number = 20): Promise<GroceryProduct[]> {

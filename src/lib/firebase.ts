@@ -15,8 +15,10 @@ import { firebaseApp } from './firebaseApp';
 let auth: Auth | null = null;
 let db: any = null;
 try {
-  auth = getAuth(firebaseApp);
-  db = getFirestore(firebaseApp);
+  if (firebaseApp) {
+    auth = getAuth(firebaseApp);
+    db = getFirestore(firebaseApp);
+  }
 } catch (error) {
   console.error('❌ Firebase initialization failed:', error);
 }

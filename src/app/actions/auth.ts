@@ -40,6 +40,10 @@ export async function loginUserWithPasswordAction(phoneNumber: string, passwordA
   
   try {
     const db = adminDb();
+    if (!db) {
+      console.error('Firebase Admin not initialized');
+      return { success: false, message: 'Database not available' };
+    }
     // phoneNumber is now expected to be in E.164 format (e.g., +91XXXXXXXXXX)
     const userDocSnap = await db.collection('users').doc(phoneNumber).get();
 
@@ -91,6 +95,10 @@ export async function requestPasswordResetOtpAction(
 
   try {
     const db = adminDb();
+    if (!db) {
+      console.error('Firebase Admin not initialized');
+      return { success: false, message: 'Database not available' };
+    }
     const userDocSnap = await db.collection('users').doc(fullPhoneNumber).get();
 
     if (!userDocSnap.exists) {
@@ -156,6 +164,10 @@ export async function verifyResetOtpAndSetNewPasswordAction(
     // const credential = PhoneAuthProvider.credential(verificationId, otp); // This line might not be useful without signInWithCredential
 
     const db = adminDb();
+    if (!db) {
+      console.error('Firebase Admin not initialized');
+      return { success: false, message: 'Database not available' };
+    }
     const userDocRef = db.collection('users').doc(phoneNumber);
     const userDocSnap = await userDocRef.get();
 

@@ -13,8 +13,8 @@ NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id_here
 # Google Maps API Key for grocery shopping features
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 
-# Vendor API URL for grocery services
-NEXT_PUBLIC_VENDOR_API_URL=https://thru-vendor-dashboard-8ckxjtfqj-keval65-modals-projects.vercel.app
+# Vendor API URL for grocery services (V4)
+NEXT_PUBLIC_VENDOR_API_URL=https://merchant.kiptech.in/api
 
 # reCAPTCHA Configuration (Temporarily Disabled)
 # NEXT_PUBLIC_RECAPTCHA_SITE_KEY=your_recaptcha_v2_site_key_here

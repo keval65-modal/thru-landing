@@ -128,20 +128,31 @@ export class FCMService {
     orderData: any
   ): Promise<boolean> {
     try {
-      // This would typically be done server-side
-      // For now, we'll just log the notification
       console.log('Sending notification to vendor:', {
         vendorId,
         orderId,
         orderData
       })
 
-      // In a real implementation, you would:
-      // 1. Get vendor's FCM token from database
-      // 2. Send notification via Firebase Admin SDK
-      // 3. Handle delivery status
+      // Call server-side API to send FCM notification
+      const response = await fetch('/api/notifications/send-vendor', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          vendorId,
+          orderId,
+          orderData
+        })
+      })
 
-      return true
+      if (!response.ok) {
+        throw new Error(`Failed to send notification: ${response.statusText}`)
+      }
+
+      const result = await response.json()
+      return result.success
     } catch (error) {
       console.error('Error sending vendor notification:', error)
       return false

@@ -280,3 +280,4 @@ export default function GrocerySearchEnhanced({ onOrderPlaced }: GrocerySearchEn
     </div>
   )
 }
+

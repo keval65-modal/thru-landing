@@ -95,12 +95,12 @@ export class GroceryFirestoreService {
         return []
       }
 
-      // Create a query for products that are available
+      // Create a simple query without filtering by is_available first
+      // We'll filter in memory to avoid index issues
       const q = query(
         collection(db, this.productsCollection),
-        where('is_available', '==', true),
         orderBy('display_name'),
-        limit(limitCount)
+        limit(limitCount * 2) // Get more to account for filtering
       )
 
       const querySnapshot = await getDocs(q)
@@ -116,12 +116,24 @@ export class GroceryFirestoreService {
         } as GroceryProduct)
       })
 
+      console.log(`Found ${products.length} products from Firestore`)
+
+      // Filter out products that are explicitly unavailable (is_available === false)
+      // Keep products where is_available is true or undefined/null
+      const availableProducts = products.filter(product => 
+        product.is_available !== false
+      )
+
+      console.log(`${availableProducts.length} products after availability filter`)
+
       // Client-side fuzzy search filtering
       if (searchTerm.trim()) {
-        return this.fuzzySearch(products, searchTerm)
+        const filteredProducts = this.fuzzySearch(availableProducts, searchTerm)
+        console.log(`${filteredProducts.length} products after search filter`)
+        return filteredProducts.slice(0, limitCount)
       }
 
-      return products
+      return availableProducts.slice(0, limitCount)
     } catch (error) {
       console.error('Error searching products:', error)
       return []
@@ -141,9 +153,8 @@ export class GroceryFirestoreService {
 
     const q = query(
       collection(db, this.productsCollection),
-      where('is_available', '==', true),
       orderBy('display_name'),
-      limit(limitCount)
+      limit(limitCount * 2) // Get more to account for filtering
     )
 
     return onSnapshot(q, (querySnapshot: QuerySnapshot<DocumentData>) => {
@@ -159,12 +170,22 @@ export class GroceryFirestoreService {
         } as GroceryProduct)
       })
 
+      console.log(`[Subscribe] Found ${products.length} products from Firestore`)
+
+      // Filter out products that are explicitly unavailable (is_available === false)
+      const availableProducts = products.filter(product => 
+        product.is_available !== false
+      )
+
+      console.log(`[Subscribe] ${availableProducts.length} products after availability filter`)
+
       // Apply fuzzy search if search term exists
       const filteredProducts = searchTerm.trim() 
-        ? this.fuzzySearch(products, searchTerm)
-        : products
+        ? this.fuzzySearch(availableProducts, searchTerm)
+        : availableProducts
 
-      onUpdate(filteredProducts)
+      console.log(`[Subscribe] ${filteredProducts.length} products after search filter`)
+      onUpdate(filteredProducts.slice(0, limitCount))
     }, (error) => {
       console.error('Error listening to products:', error)
       onUpdate([])

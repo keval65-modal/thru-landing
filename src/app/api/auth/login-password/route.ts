@@ -20,6 +20,9 @@ export async function POST(req: NextRequest) {
 
     // Fetch user doc by phone number (E.164 id)
     const db = adminDb();
+    if (!db) {
+      return NextResponse.json({ success: false, message: 'Database not available' }, { status: 500 });
+    }
     const userDocId = phoneNumber;
     console.log('[LoginAPI] Fetching user doc', { userDocId });
     const userSnap = await db.collection('users').doc(userDocId).get();
@@ -47,6 +50,9 @@ export async function POST(req: NextRequest) {
 
     // Ensure a Firebase Auth user exists for this phone number
     const auth = adminAuth();
+    if (!auth) {
+      return NextResponse.json({ success: false, message: 'Authentication not available' }, { status: 500 });
+    }
     let uid: string;
     try {
       const userRecord = await auth.getUserByPhoneNumber(phoneNumber);

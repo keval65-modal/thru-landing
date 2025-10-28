@@ -2,6 +2,103 @@
 
 import { Timestamp } from 'firebase/firestore'
 
+// Store type definitions
+export type StoreType = 'grocery' | 'supermarket' | 'medical' | 'pharmacy' | 'restaurant' | 'cafe' | 'cloud_kitchen' | 'bakery' | 'fast_food' | 'fine_dining' | 'food_truck' | 'coffee_shop' | 'bar' | 'pub'
+
+export interface StoreCapabilities {
+  hasGroceryProcessing: boolean
+  storeType: StoreType
+  categories: string[]
+}
+
+// Enhanced order processing interfaces
+export interface ProcessedItem {
+  id: string
+  product_name: string
+  display_name: string
+  quantity: number
+  originalPrice: number // Customer's expected price
+  vendorPrice: number // Vendor's actual price
+  isAvailable: boolean
+  image?: string // Vendor-uploaded image
+  notes?: string // Vendor notes
+  sku_id: string
+  pack_unit: string
+  pack_value: number
+  source: string
+  category?: string
+}
+
+
+export interface ProcessedOrder {
+  id: string
+  userId: string
+  userInfo: {
+    name: string
+    phone: string
+    email?: string
+  }
+  status: 'pending' | 'processing' | 'accepted' | 'rejected' | 'preparing' | 'ready' | 'completed' | 'cancelled'
+  originalItems: CartItem[] // What customer originally ordered
+  processedItems: ProcessedItem[] // What vendor actually accepted
+  vendorResponse?: VendorResponse
+  userRoute: UserRouteData
+  totalAmount: number // Updated based on vendor pricing
+  estimatedReadyTime?: Date
+  storeType: StoreType
+  createdAt: Timestamp
+  updatedAt: Timestamp
+}
+
+// Enhanced product interface with fuzzy search support
+export interface EnhancedGroceryProduct {
+  id: string
+  product_name: string
+  display_name: string
+  pack_unit: string
+  pack_value: number
+  price: number
+  sku_id: string
+  source: string
+  category?: string
+  image_url?: string
+  description?: string
+  is_available?: boolean
+  created_at?: Timestamp
+  updated_at?: Timestamp
+  // Fuzzy search fields
+  search_terms: string[] // Pre-computed search terms for fuzzy matching
+  popularity_score: number // For ranking search results
+  user_generated: boolean // Whether this was added by a user
+  verified: boolean // Whether this product has been verified
+}
+
+// User-generated item interface
+export interface UserGeneratedItem {
+  id: string
+  userId: string
+  product_name: string
+  display_name: string
+  pack_unit: string
+  pack_value: number
+  category?: string
+  description?: string
+  image_url?: string
+  created_at: Timestamp
+  verified: boolean
+  usage_count: number // How many times this item has been used
+}
+
+// Price update interface
+export interface PriceUpdate {
+  productId: string
+  vendorId: string
+  oldPrice: number
+  newPrice: number
+  updatedAt: Timestamp
+  reason: 'vendor_bid' | 'market_update' | 'admin_update'
+}
+
 export interface UserRouteData {
   start: {
     latitude: number

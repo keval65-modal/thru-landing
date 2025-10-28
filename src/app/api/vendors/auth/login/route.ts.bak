@@ -1,0 +1,151 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { adminAuth } from '@/lib/firebaseAdmin';
+import { vendorManagementService } from '@/lib/vendor-management-service';
+
+// POST /api/vendors/auth/login - Vendor login
+export async function POST(request: NextRequest) {
+  try {
+    const { email, password, fcmToken } = await request.json();
+    
+    if (!email || !password) {
+      return NextResponse.json({ 
+        error: 'Email and password are required' 
+      }, { status: 400 });
+    }
+    
+    // Verify credentials with Firebase Auth
+    const auth = adminAuth();
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication not available' },
+        { status: 500 }
+      );
+    }
+    
+    try {
+      // Get user by email
+      const userRecord = await auth.getUserByEmail(email);
+      
+      // Verify password (Firebase handles this automatically)
+      // In production, you'd use Firebase Auth SDK on client side
+      
+      // Get vendor profile
+      const vendor = await vendorManagementService.getVendorByEmail(email);
+      if (!vendor) {
+        return NextResponse.json({ 
+          error: 'Vendor profile not found' 
+        }, { status: 404 });
+      }
+      
+      // Update FCM token if provided
+      if (fcmToken) {
+        await vendorManagementService.updateVendor(vendor.id, { fcmToken });
+      }
+      
+      // Generate custom token for client
+      const customToken = await auth.createCustomToken(userRecord.uid, {
+        vendorId: vendor.id,
+        role: 'vendor',
+        categories: vendor.categories
+      });
+      
+      return NextResponse.json({
+        success: true,
+        vendor: {
+          id: vendor.id,
+          name: vendor.name,
+          email: vendor.email,
+          location: vendor.location,
+          categories: vendor.categories,
+          capabilities: vendor.capabilities,
+          rating: vendor.rating,
+          totalOrders: vendor.totalOrders
+        },
+        customToken,
+        firebaseUid: userRecord.uid
+      });
+      
+    } catch (authError) {
+      return NextResponse.json({ 
+        error: 'Invalid credentials' 
+      }, { status: 401 });
+    }
+    
+  } catch (error) {
+    console.error('Error in vendor login:', error);
+    return NextResponse.json({ 
+      error: 'Login failed' 
+    }, { status: 500 });
+  }
+}
+
+// GET /api/vendors/auth/profile - Get vendor profile (requires auth)
+export async function GET(request: NextRequest) {
+  try {
+    const authHeader = request.headers.get('authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ 
+        error: 'Authorization header required' 
+      }, { status: 401 });
+    }
+    
+    const token = authHeader.split('Bearer ')[1];
+    const auth = adminAuth();
+    if (!auth) {
+      return NextResponse.json(
+        { success: false, error: 'Authentication not available' },
+        { status: 500 }
+      );
+    }
+    
+    try {
+      const decodedToken = await auth.verifyIdToken(token);
+      const vendorId = decodedToken.vendorId;
+      
+      if (!vendorId) {
+        return NextResponse.json({ 
+          error: 'Invalid vendor token' 
+        }, { status: 401 });
+      }
+      
+      const vendor = await vendorManagementService.getVendor(vendorId);
+      if (!vendor) {
+        return NextResponse.json({ 
+          error: 'Vendor not found' 
+        }, { status: 404 });
+      }
+      
+      return NextResponse.json({
+        vendor: {
+          id: vendor.id,
+          name: vendor.name,
+          email: vendor.email,
+          phone: vendor.phone,
+          location: vendor.location,
+          categories: vendor.categories,
+          deliveryRadius: vendor.deliveryRadius,
+          operatingHours: vendor.operatingHours,
+          capabilities: vendor.capabilities,
+          rating: vendor.rating,
+          totalOrders: vendor.totalOrders,
+          responseTime: vendor.responseTime,
+          isActive: vendor.isActive
+        }
+      });
+      
+    } catch (tokenError) {
+      return NextResponse.json({ 
+        error: 'Invalid token' 
+      }, { status: 401 });
+    }
+    
+  } catch (error) {
+    console.error('Error fetching vendor profile:', error);
+    return NextResponse.json({ 
+      error: 'Failed to fetch profile' 
+    }, { status: 500 });
+  }
+}
+
+
+

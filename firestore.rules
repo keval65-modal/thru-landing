@@ -1,0 +1,81 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Allow public read access to vendors collection (for user app browsing)
+    match /vendors/{vendorId} {
+      // Allow anyone to read vendor data (needed for user app)
+      allow read: if true;
+      
+      // Keep existing write permissions for authenticated vendors
+      allow write: if request.auth != null && 
+        (resource.data.uid == request.auth.uid || 
+         request.auth.uid == resource.data.uid);
+      
+      // Allow vendors to manage their inventory
+      match /inventory/{itemId} {
+        allow read: if request.auth != null;
+        allow write: if request.auth != null && 
+          get(/databases/$(database)/documents/vendors/$(vendorId)).data.uid == request.auth.uid;
+      }
+    }
+    
+    // Allow authenticated users to create vendor documents
+    match /vendors/{vendorId} {
+      allow create: if request.auth != null && 
+        request.resource.data.uid == request.auth.uid;
+    }
+    
+    // Allow reading inventory for authenticated users
+    match /vendors/{vendorId}/inventory/{itemId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        get(/databases/$(database)/documents/vendors/$(vendorId)).data.uid == request.auth.uid;
+    }
+    
+    // Allow admin access to pending changes
+    match /pendingChanges/{changeId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow admin access to admin notifications
+    match /admin_notifications/{notificationId} {
+      allow read, write: if request.auth != null;
+    }
+    
+    // Allow reading global inventory (for backward compatibility)
+    match /inventory/{itemId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && 
+        resource.data.vendorId == request.auth.uid;
+    }
+    
+    // Allow public read access to grocery-skus collection (for user app browsing)
+    match /grocery-skus/{skuId} {
+      allow read: if true; // Allow anyone to read grocery SKUs
+      allow write: if request.auth != null; // Only authenticated users can write
+    }
+    
+    // Allow public read access to shops collection (for user app browsing)
+    match /shops/{shopId} {
+      allow read: if true; // Allow anyone to read shop data
+      allow write: if request.auth != null; // Only authenticated users can write
+    }
+    
+    // Allow public read access to orders collection (for order tracking)
+    match /orders/{orderId} {
+      allow read: if request.auth != null; // Only authenticated users can read their orders
+      allow write: if request.auth != null; // Only authenticated users can create/update orders
+    }
+    
+    // Allow public read access to vendor-responses collection (for order tracking)
+    match /vendor-responses/{responseId} {
+      allow read: if request.auth != null; // Only authenticated users can read responses
+      allow write: if request.auth != null; // Only authenticated users can create responses
+    }
+    
+    // Keep existing rules for other collections (users, orders, etc.)
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

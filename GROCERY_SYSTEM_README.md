@@ -71,7 +71,7 @@ Copy `env-template.txt` to `.env.local` and fill in your values:
 NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_google_maps_api_key_here
 
 # Vendor API URL
-NEXT_PUBLIC_VENDOR_API_URL=https://thru-vendor-dashboard-8ckxjtfqj-keval65-modals-projects.vercel.app
+NEXT_PUBLIC_VENDOR_API_URL=https://thru-vendor-dashboard-adb8o00cx-keval65-modals-projects.vercel.app/api
 ```
 
 #### For Vercel Deployment:

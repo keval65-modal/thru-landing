@@ -1,0 +1,222 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { VendorRequestService } from '@/lib/vendor-request-service';
+import { VendorRequestPayload, VendorResponsePayload, OrderCreationPayload } from '@/types/vendor-requests';
+import { vendorNotificationService } from '@/lib/vendor-notification-service';
+import { vendorManagementService } from '@/lib/vendor-management-service';
+import { db } from '@/lib/firebase';
+import { collection, addDoc, getDocs, query, where, orderBy, doc, updateDoc } from 'firebase/firestore';
+
+// POST /api/requests - Create a new vendor request
+export async function POST(request: NextRequest) {
+  try {
+    const payload: VendorRequestPayload = await request.json();
+    
+    // Validate payload
+    const validation = VendorRequestService.validateRequestPayload(payload);
+    if (!validation.isValid) {
+      return NextResponse.json({ 
+        error: 'Invalid request payload', 
+        details: validation.errors 
+      }, { status: 400 });
+    }
+    
+    // Normalize units and generate suggested packs
+    const normalizedItems = VendorRequestService.normalizeUnits(payload.items);
+    const itemsWithSuggestedPacks = normalizedItems.map(item => ({
+      ...item,
+      suggested_packs: VendorRequestService.generateSuggestedPacks(item)
+    }));
+    
+    const normalizedPayload: VendorRequestPayload = {
+      ...payload,
+      items: itemsWithSuggestedPacks
+    };
+    
+    // Store request in Firestore
+    const requestRef = await addDoc(collection(db, 'vendor_requests'), {
+      ...normalizedPayload,
+      created_at: new Date().toISOString(),
+      status: 'pending',
+      vendor_responses: []
+    });
+    
+    // Send notifications to nearby vendors
+    await notifyNearbyVendors(normalizedPayload);
+    
+    return NextResponse.json({ 
+      success: true, 
+      request_id: payload.request_id,
+      firestore_id: requestRef.id 
+    }, { status: 201 });
+    
+  } catch (error) {
+    console.error('Error creating vendor request:', error);
+    return NextResponse.json({ 
+      error: 'Failed to create vendor request' 
+    }, { status: 500 });
+  }
+}
+
+// GET /api/requests/{request_id}/offers - Get aggregated vendor offers
+export async function GET(request: NextRequest) {
+  try {
+    const url = new URL(request.url);
+    const requestId = url.searchParams.get('request_id');
+    
+    if (!requestId) {
+      return NextResponse.json({ 
+        error: 'request_id parameter is required' 
+      }, { status: 400 });
+    }
+    
+    // Get the original request
+    const requestQuery = query(
+      collection(db, 'vendor_requests'), 
+      where('request_id', '==', requestId)
+    );
+    const requestSnapshot = await getDocs(requestQuery);
+    
+    if (requestSnapshot.empty) {
+      return NextResponse.json({ 
+        error: 'Request not found' 
+      }, { status: 404 });
+    }
+    
+    const requestDoc = requestSnapshot.docs[0];
+    const requestData = requestDoc.data() as VendorRequestPayload;
+    
+    // Get all vendor responses for this request
+    const responsesQuery = query(
+      collection(db, 'vendor_responses'),
+      where('request_id', '==', requestId),
+      orderBy('submitted_at', 'desc')
+    );
+    const responsesSnapshot = await getDocs(responsesQuery);
+    
+    const vendorResponses: VendorResponsePayload[] = responsesSnapshot.docs.map(doc => 
+      doc.data() as VendorResponsePayload
+    );
+    
+    // Aggregate offers
+    const aggregatedOffers = VendorRequestService.aggregateVendorOffers(
+      requestData, 
+      vendorResponses
+    );
+    
+    return NextResponse.json({
+      request_id: requestId,
+      offers: aggregatedOffers,
+      total_vendors: vendorResponses.length,
+      deadline_utc: requestData.deadline_utc
+    });
+    
+  } catch (error) {
+    console.error('Error fetching vendor offers:', error);
+    return NextResponse.json({ 
+      error: 'Failed to fetch vendor offers' 
+    }, { status: 500 });
+  }
+}
+
+// POST /api/requests/{request_id}/vendor_reply - Vendor webhook to submit offers
+export async function PUT(request: NextRequest) {
+  try {
+    const url = new URL(request.url);
+    const requestId = url.searchParams.get('request_id');
+    
+    if (!requestId) {
+      return NextResponse.json({ 
+        error: 'request_id parameter is required' 
+      }, { status: 400 });
+    }
+    
+    const payload: VendorResponsePayload = await request.json();
+    
+    // Validate payload
+    const validation = VendorRequestService.validateResponsePayload(payload);
+    if (!validation.isValid) {
+      return NextResponse.json({ 
+        error: 'Invalid response payload', 
+        details: validation.errors 
+      }, { status: 400 });
+    }
+    
+    // Verify request exists
+    const requestQuery = query(
+      collection(db, 'vendor_requests'), 
+      where('request_id', '==', requestId)
+    );
+    const requestSnapshot = await getDocs(requestQuery);
+    
+    if (requestSnapshot.empty) {
+      return NextResponse.json({ 
+        error: 'Request not found' 
+      }, { status: 404 });
+    }
+    
+    // Store vendor response
+    const responseRef = await addDoc(collection(db, 'vendor_responses'), {
+      ...payload,
+      submitted_at: new Date().toISOString()
+    });
+    
+    // Update request with vendor response count
+    const requestDoc = requestSnapshot.docs[0];
+    await updateDoc(doc(db, 'vendor_requests', requestDoc.id), {
+      vendor_responses: requestDoc.data().vendor_responses + 1,
+      updated_at: new Date().toISOString()
+    });
+    
+    return NextResponse.json({ 
+      success: true, 
+      response_id: responseRef.id 
+    }, { status: 201 });
+    
+  } catch (error) {
+    console.error('Error processing vendor response:', error);
+    return NextResponse.json({ 
+      error: 'Failed to process vendor response' 
+    }, { status: 500 });
+  }
+}
+
+// Helper function to notify nearby vendors
+async function notifyNearbyVendors(request: VendorRequestPayload) {
+  try {
+    console.log(`🔔 Notifying vendors for request ${request.request_id}`);
+    
+    // Find nearby vendors
+    const nearbyVendors = await vendorManagementService.findNearbyVendors(
+      request.location,
+      10, // 10km radius
+      ['grocery'] // Default to grocery vendors
+    );
+    
+    console.log(`📍 Found ${nearbyVendors.length} nearby vendors`);
+    
+    if (nearbyVendors.length === 0) {
+      console.log('⚠️ No vendors found in the area');
+      return;
+    }
+    
+    // Get vendor FCM tokens
+    const vendorIds = nearbyVendors.map(v => v.id);
+    const vendorTokens = await vendorManagementService.getVendorTokens(vendorIds);
+    
+    console.log(`📱 Sending notifications to ${vendorTokens.length} vendors`);
+    
+    if (vendorTokens.length === 0) {
+      console.log('⚠️ No vendor FCM tokens available');
+      return;
+    }
+    
+    // Send FCM notifications
+    await vendorNotificationService.sendVendorRequest(request, vendorTokens);
+    
+    console.log(`✅ Vendor notifications sent successfully`);
+    
+  } catch (error) {
+    console.error('❌ Error notifying vendors:', error);
+    // Don't throw error - request should still be created even if notifications fail
+  }
+}
