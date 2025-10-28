@@ -41,6 +41,7 @@ import { DynamicProduct } from "@/lib/scalable-grocery-ai-service";
 import { purchasePatternTracker } from "@/lib/purchase-pattern-tracker";
 import { VendorRequestPayload, AggregatedItemOffer } from "@/types/vendor-requests";
 import { enhancedOrderService } from "@/lib/enhanced-order-service";
+import { routeBasedShopDiscovery, RoutePoint } from "@/lib/route-based-shop-discovery";
 
 function HomePageContent() {
   const router = useRouter();
@@ -712,21 +713,21 @@ function HomePageContent() {
 
       console.log('🍽️ Finding food shops along route:', { startCoords, destCoords });
 
-      // Use enhanced order service to find food shops
-      const shops = await enhancedOrderService.findShopsAlongRoute(
+      // Use route-based shop discovery to find food shops
+      const result = await routeBasedShopDiscovery.findShopsAlongRoute(
         { latitude: startCoords.lat, longitude: startCoords.lng, address: startAddress },
         { latitude: destCoords.lat, longitude: destCoords.lng, address: destAddress },
         maxDetourKm,
-        ['restaurant', 'cafe', 'cloud_kitchen', 'bakery', 'fast_food', 'fine_dining', 'food_truck', 'coffee_shop', 'bar', 'pub']
+        ['restaurant', 'cafe', 'cloud_kitchen', 'bakery', 'fast_food', 'fine_dining', 'food_truck', 'coffee_shop', 'bar', 'pub'] as any
       );
 
-      console.log(`✅ Found ${shops.length} food shops`);
-      setFoodShops(shops);
+      console.log(`✅ Found ${result.shops.length} food shops`);
+      setFoodShops(result.shops);
 
-      if (shops.length > 0) {
+      if (result.shops.length > 0) {
         toast({
           title: "Food Shops Found!",
-          description: `Discovered ${shops.length} food outlet${shops.length > 1 ? 's' : ''} along your route.`,
+          description: `Discovered ${result.shops.length} food outlet${result.shops.length > 1 ? 's' : ''} along your route.`,
         });
       }
     } catch (error) {
@@ -739,7 +740,7 @@ function HomePageContent() {
     } finally {
       setLoadingFoodShops(false);
     }
-  }, [selectedStartLocation, selectedDestination, maxDetourKm, toast]);
+  }, [selectedStartLocation, selectedDestination, startLocationQuery, destinationQuery, maxDetourKm, toast]);
 
   // Load food shops when route changes or when food tab becomes active
   React.useEffect(() => {
