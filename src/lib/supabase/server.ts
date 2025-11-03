@@ -4,14 +4,16 @@
  */
 
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { cookies } from 'next/headers'
 import type { Database } from './types'
 
 /**
  * Create Supabase client for Server Components
  * Uses user's auth context
+ * NOTE: Only use in Server Components, not in API routes
  */
 export async function createServerSupabaseClient() {
+  // Dynamic import to avoid build errors
+  const { cookies } = await import('next/headers')
   const cookieStore = await cookies()
 
   return createServerClient<Database>(
@@ -47,6 +49,7 @@ export async function createServerSupabaseClient() {
  * Create Supabase client with Service Role key
  * For admin operations (bypasses RLS)
  * USE WITH CAUTION - only in secure server contexts
+ * Safe to use in API routes
  */
 export function createServiceSupabaseClient() {
   if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
@@ -65,5 +68,3 @@ export function createServiceSupabaseClient() {
     }
   )
 }
-
-
