@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import VendorOrderService from '@/lib/vendor-order-service';
+import { SupabaseVendorService } from '@/lib/supabase/vendor-service';
 
 export async function POST(request: Request) {
   try {
-    console.log('🚀🚀🚀 API ROUTE CALLED - V4 FORCE DEPLOY - 2024-10-21');
+    console.log('🚀🚀🚀 API ROUTE CALLED - V5 SUPABASE VENDORS - 2025-11-03');
     const body = await request.json();
     const { items, route, detourPreferences, userId } = body;
 
@@ -51,16 +52,16 @@ export async function POST(request: Request) {
     const orderRef = await db.collection('groceryOrders').add(orderData);
     console.log(`✅ Order created with ID: ${orderRef.id}`);
 
-    // Find vendors along the route
-    const vendorsSnapshot = await db.collection('vendors').get();
-    const allVendors = vendorsSnapshot.docs.map((doc: any) => ({
-      id: doc.id,
-      ...doc.data()
-    }));
+    // Find vendors along the route from SUPABASE (where vendor app saves them)
+    console.log('🔍 Querying vendors from Supabase...');
+    const allVendors = await SupabaseVendorService.getActiveVendors({
+      storeType: 'grocery'
+    });
+    console.log(`📊 Found ${allVendors.length} active vendors from Supabase`);
 
-    // Filter grocery-enabled vendors (check both groceryEnabled flag and storeCategory)
+    // Filter grocery-enabled vendors
     const groceryVendors = allVendors.filter((vendor: any) => 
-      vendor.groceryEnabled === true || vendor.storeCategory === 'grocery'
+      vendor.groceryEnabled === true || vendor.storeType === 'grocery' || vendor.storeCategory === 'grocery'
     );
     console.log(`🛒 Found ${groceryVendors.length} grocery-enabled vendors`);
 
@@ -107,11 +108,11 @@ export async function POST(request: Request) {
       ...orderData
     });
 
-    console.log('🚀🚀🚀 SENDING ORDER TO VENDOR APP (V4 - FORCE DEPLOY):', {
+    console.log('🚀🚀🚀 SENDING ORDER TO VENDOR APP (V5 - SUPABASE):', {
       orderId: orderRef.id,
       vendorApiUrl: 'https://merchant.kiptech.in/api',
       timestamp: new Date().toISOString(),
-      version: 'V4-FORCE-DEPLOY-2024-10-21'
+      version: 'V5-SUPABASE-VENDORS-2025-11-03'
     });
     
     const vendorResult = await vendorOrderService.sendOrderToVendorApp(transformedOrderData);
@@ -153,19 +154,21 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       success: true,
-      message: 'Grocery order created successfully! (V4 - FORCE DEPLOY - 2024-10-21)',
+      message: 'Grocery order created successfully! (V5 - SUPABASE VENDORS - 2025-11-03)',
       orderId: orderRef.id,
       vendorsFound: routeVendors.length,
       notificationsSent: notifications.length,
       vendorAppSent: vendorResult.success,
       vendorAppError: vendorResult.error,
-      deploymentVersion: 'V4-FORCE-DEPLOY-2024-10-21',
+      deploymentVersion: 'V5-SUPABASE-VENDORS-2025-11-03',
+      dataSource: 'Supabase',
       timestamp: new Date().toISOString(),
       vendors: routeVendors.map((vendor: any) => ({
         id: vendor.id,
         name: (vendor as any).name || 'Unknown Vendor',
         email: vendor.email,
-        location: vendor.location
+        location: vendor.location,
+        storeType: vendor.storeType
       })),
       notifications: notifications
     });
