@@ -36,7 +36,8 @@ export class OneSignalNotificationService {
 
     try {
       // Dynamically import OneSignal (client-side only)
-      const OneSignal = (await import('react-onesignal')).default
+      // Type is any to avoid build-time type checking for optional dependency
+      const OneSignal = (await import('react-onesignal' as any)).default as any
 
       await OneSignal.init({
         appId: process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID!,
@@ -46,6 +47,7 @@ export class OneSignalNotificationService {
       console.log('✅ OneSignal initialized')
     } catch (error) {
       console.error('❌ Failed to initialize OneSignal:', error)
+      // OneSignal is optional, continue without it
     }
   }
 
