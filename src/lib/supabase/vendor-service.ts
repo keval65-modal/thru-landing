@@ -109,18 +109,18 @@ export class SupabaseVendorService {
 
       if (error) throw error
 
-      let vendors = (data || []).map((v: any) => ({
+      let vendors: NearbyVendor[] = (data || []).map((v: any) => ({
         ...this.mapVendorFromDb(v),
         distanceKm: v.distance_km,
       }))
 
       // Apply additional filters
       if (filters?.storeType) {
-        vendors = vendors.filter((v) => v.storeType === filters.storeType)
+        vendors = vendors.filter((v: NearbyVendor) => v.storeType === filters.storeType)
       }
 
       if (filters?.category) {
-        vendors = vendors.filter((v) => v.categories.includes(filters.category!))
+        vendors = vendors.filter((v: NearbyVendor) => v.categories.includes(filters.category!))
       }
 
       return vendors
