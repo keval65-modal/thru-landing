@@ -10,6 +10,7 @@ import {
   Timestamp
 } from 'firebase/firestore'
 import { db } from './firebase'
+import { SupabaseVendorService } from './supabase/vendor-service'
 import { StoreType, StoreCapabilities } from '@/types/grocery-advanced'
 
 export interface RoutePoint {
@@ -121,43 +122,45 @@ export class RouteBasedShopDiscovery {
     }
   }
 
-  // Get all shops from database
+  // Get all shops from database (NOW USING SUPABASE!)
   private async getAllShops(): Promise<ShopLocation[]> {
-    if (!db) {
-      throw new Error('Firestore not initialized')
+    try {
+      console.log('🔍 Fetching vendors from SUPABASE...')
+      
+      // Get all active vendors from Supabase
+      const vendors = await SupabaseVendorService.getActiveVendors()
+      console.log(`📊 Found ${vendors.length} active vendors in Supabase`)
+
+      const shops: ShopLocation[] = []
+
+      vendors.forEach((vendor) => {
+        const shopLat = vendor.location?.latitude
+        const shopLng = vendor.location?.longitude
+
+        if (shopLat && shopLng) {
+          shops.push({
+            id: vendor.id,
+            name: vendor.name || 'Unknown Shop',
+            type: this.determineStoreType(vendor.categories || []),
+            coordinates: { lat: shopLat, lng: shopLng },
+            address: vendor.address || 'Address not available',
+            categories: vendor.categories || [],
+            isActiveOnThru: vendor.isActiveOnThru || true,
+            rating: 4.5, // Default rating
+            phone: vendor.phone,
+            email: vendor.email,
+            businessHours: vendor.operatingHours
+          })
+        }
+      })
+
+      console.log(`✅ Mapped ${shops.length} vendors with valid locations`)
+      return shops
+    } catch (error) {
+      console.error('❌ Error fetching vendors from Supabase:', error)
+      // Fallback to empty array instead of Firebase
+      return []
     }
-
-    const q = query(
-      collection(db, this.shopsCollection),
-      where('isActiveOnThru', '==', true)
-    )
-
-    const querySnapshot = await getDocs(q)
-    const shops: ShopLocation[] = []
-
-    querySnapshot.forEach((doc) => {
-      const data = doc.data()
-      const shopLat = data.coordinates?.lat || data.location?.latitude
-      const shopLng = data.coordinates?.lng || data.location?.longitude
-
-      if (shopLat && shopLng) {
-        shops.push({
-          id: doc.id,
-          name: data.shopName || data.name || 'Unknown Shop',
-          type: this.determineStoreType(data.categories || []),
-          coordinates: { lat: shopLat, lng: shopLng },
-          address: data.address || 'Address not available',
-          categories: data.categories || [],
-          isActiveOnThru: data.isActiveOnThru,
-          rating: data.rating,
-          phone: data.phone,
-          email: data.email,
-          businessHours: data.businessHours
-        })
-      }
-    })
-
-    return shops
   }
 
   // Filter shops by store types
