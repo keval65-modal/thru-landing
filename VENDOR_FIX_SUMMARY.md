@@ -230,3 +230,4 @@ Your cafe will now:
 
 **Need help?** Check the console logs and verify your cafe's data in Supabase.
 
+

@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
-import { orderListenerService, type OrderUpdate, type VendorResponseUpdate } from '@/lib/order-listener-service'
+import { supabaseRealtimeService, type OrderUpdate, type VendorResponseUpdate } from '@/lib/supabase/realtime-service'
 import { useToast } from './use-toast'
 
 /**
  * Hook to listen to a specific order's updates in real-time
+ * NOW USING SUPABASE REALTIME! 🎉
  */
 export function useOrderListener(orderId: string | null) {
   const [order, setOrder] = useState<OrderUpdate | null>(null)
@@ -18,40 +19,48 @@ export function useOrderListener(orderId: string | null) {
       return
     }
 
+    console.log('📡 Subscribing to Supabase Realtime for order:', orderId)
     setLoading(true)
     setError(null)
 
-    // Subscribe to order updates
-    const unsubscribeOrder = orderListenerService.subscribeToOrder(
+    // Subscribe to order updates via Supabase Realtime
+    const unsubscribeOrder = supabaseRealtimeService.subscribeToOrder(
       orderId,
       (orderUpdate) => {
+        console.log('📦 Supabase order update received:', orderUpdate)
         setOrder(orderUpdate)
         setLoading(false)
         
         // Show toast for status changes
-        if (orderUpdate.status === 'vendor_accepted') {
+        if (orderUpdate.status === 'confirmed') {
           toast({
-            title: "Order Accepted! 🎉",
-            description: "A vendor has accepted your order",
+            title: "Order Confirmed! 🎉",
+            description: "A vendor has confirmed your order",
           })
-        } else if (orderUpdate.status === 'vendor_rejected') {
+        } else if (orderUpdate.status === 'preparing') {
           toast({
-            title: "Order Update",
-            description: "Vendor response received",
-            variant: "destructive"
+            title: "Order Preparing",
+            description: "Your order is being prepared",
+          })
+        } else if (orderUpdate.status === 'completed') {
+          toast({
+            title: "Order Completed! ✅",
+            description: "Your order is ready",
           })
         }
       },
       (err) => {
+        console.error('❌ Supabase order listener error:', err)
         setError(err.message)
         setLoading(false)
       }
     )
 
-    // Subscribe to vendor responses
-    const unsubscribeResponses = orderListenerService.subscribeToVendorResponses(
+    // Subscribe to vendor responses via Supabase Realtime
+    const unsubscribeResponses = supabaseRealtimeService.subscribeToVendorResponses(
       orderId,
       (response) => {
+        console.log('🏪 Supabase vendor response received:', response)
         setVendorResponses(prev => {
           const existing = prev.find(r => r.vendorId === response.vendorId)
           if (existing) {
@@ -77,11 +86,12 @@ export function useOrderListener(orderId: string | null) {
         }
       },
       (err) => {
-        console.error('Error in vendor responses:', err)
+        console.error('❌ Supabase vendor response listener error:', err)
       }
     )
 
     return () => {
+      console.log('🧹 Cleaning up Supabase Realtime subscriptions')
       unsubscribeOrder()
       unsubscribeResponses()
     }
@@ -97,6 +107,7 @@ export function useOrderListener(orderId: string | null) {
 
 /**
  * Hook to listen to all orders for the current user
+ * NOW USING SUPABASE REALTIME! 🎉
  */
 export function useUserOrders(userId: string | null, options?: { status?: string; limit?: number }) {
   const [orders, setOrders] = useState<OrderUpdate[]>([])
@@ -108,18 +119,23 @@ export function useUserOrders(userId: string | null, options?: { status?: string
       return
     }
 
+    console.log('📡 Subscribing to Supabase Realtime for user orders:', userId)
     setLoading(true)
 
-    const unsubscribe = orderListenerService.subscribeToUserOrders(
+    const unsubscribe = supabaseRealtimeService.subscribeToUserOrders(
       userId,
       (updatedOrders) => {
+        console.log(`📦 Received ${updatedOrders.length} orders from Supabase Realtime`)
         setOrders(updatedOrders)
         setLoading(false)
       },
       options
     )
 
-    return () => unsubscribe()
+    return () => {
+      console.log('🧹 Cleaning up user orders subscription')
+      unsubscribe()
+    }
   }, [userId, options?.status, options?.limit])
 
   return {
@@ -146,4 +162,6 @@ export function useOrderRefresh() {
     refresh
   }
 }
+
+
 

@@ -314,13 +314,23 @@ export class SupabaseVendorService {
    * Map database record to Vendor interface
    */
   private static mapVendorFromDb(data: any): Vendor {
+    // Convert GeoJSON Point format to {latitude, longitude} format
+    let location = data.location;
+    if (location && location.type === 'Point' && location.coordinates) {
+      // GeoJSON format: [longitude, latitude]
+      location = {
+        longitude: location.coordinates[0],
+        latitude: location.coordinates[1]
+      };
+    }
+
     return {
       id: data.id,
       name: data.name,
       phone: data.phone,
       email: data.email,
       address: data.address,
-      location: data.location,
+      location: location,
       categories: data.categories || [],
       storeType: data.store_type,
       isActive: data.is_active ?? true,

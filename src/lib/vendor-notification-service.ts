@@ -3,7 +3,13 @@ import { getAdminApp } from './firebaseAdmin';
 import { VendorRequestPayload, VendorResponsePayload } from '@/types/vendor-requests';
 
 export class VendorNotificationService {
-  private messaging = getMessaging(getAdminApp() || undefined);
+  private getMessagingInstance() {
+    const adminApp = getAdminApp();
+    if (!adminApp) {
+      throw new Error('Firebase Admin not initialized');
+    }
+    return getMessaging(adminApp);
+  }
 
   /**
    * Send vendor request notification to nearby vendors
@@ -28,7 +34,7 @@ export class VendorNotificationService {
     };
 
     try {
-      const response = await this.messaging.sendMulticast({
+      const response = await this.getMessagingInstance().sendMulticast({
         tokens: vendorTokens,
         notification,
         data: notification.data,
@@ -90,7 +96,7 @@ export class VendorNotificationService {
     };
 
     try {
-      const response = await this.messaging.send({
+      const response = await this.getMessagingInstance().send({
         token: vendorToken,
         notification,
         data: notification.data,
@@ -150,7 +156,7 @@ export class VendorNotificationService {
     };
 
     try {
-      const response = await this.messaging.send({
+      const response = await this.getMessagingInstance().send({
         token: userToken,
         notification,
         data: notification.data,
@@ -190,7 +196,7 @@ export class VendorNotificationService {
    */
   async subscribeVendorToLocation(vendorToken: string, location: string) {
     try {
-      await this.messaging.subscribeToTopic([vendorToken], `location_${location}`);
+      await this.getMessagingInstance().subscribeToTopic([vendorToken], `location_${location}`);
       console.log(`✅ Vendor subscribed to location topic: location_${location}`);
     } catch (error) {
       console.error('Error subscribing vendor to location:', error);
@@ -203,7 +209,7 @@ export class VendorNotificationService {
    */
   async unsubscribeVendorFromLocation(vendorToken: string, location: string) {
     try {
-      await this.messaging.unsubscribeFromTopic([vendorToken], `location_${location}`);
+      await this.getMessagingInstance().unsubscribeFromTopic([vendorToken], `location_${location}`);
       console.log(`✅ Vendor unsubscribed from location topic: location_${location}`);
     } catch (error) {
       console.error('Error unsubscribing vendor from location:', error);

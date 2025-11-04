@@ -305,3 +305,4 @@ Your cafe should now be visible in the user app. When users plan a route near yo
 
 Good luck! 🎉
 
+

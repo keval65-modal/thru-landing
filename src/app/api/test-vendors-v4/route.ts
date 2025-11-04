@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { v4TestVendorService, V4_TEST_VENDORS } from '@/lib/test-vendors-v4';
+import { db } from '@/lib/firebase';
+import { collection, getDocs } from 'firebase/firestore';
 
 /**
  * V4 Test Vendors API Endpoint
@@ -9,156 +10,60 @@ import { v4TestVendorService, V4_TEST_VENDORS } from '@/lib/test-vendors-v4';
 // GET /api/test-vendors-v4 - Get all V4 test vendors
 export async function GET(request: NextRequest) {
   try {
-    console.log('🔍 Fetching V4 test vendors...');
-    
+    console.log('🔍 Fetching vendors from Firestore...');
+
+    if (!db) {
+      return NextResponse.json({ success: false, error: 'Firebase not initialized' }, { status: 500 });
+    }
+
     const url = new URL(request.url);
     const category = url.searchParams.get('category');
     const vendorId = url.searchParams.get('vendorId');
 
-    let vendors;
+    const snapshot = await getDocs(collection(db, 'vendors'));
+    let vendors = snapshot.docs.map((doc) => ({ id: doc.id, ...(doc.data() as any) }));
+
     if (vendorId) {
-      const vendor = v4TestVendorService.getV4TestVendor(vendorId);
-      vendors = vendor ? [vendor] : [];
-    } else if (category) {
-      vendors = v4TestVendorService.getV4TestVendorsByCategory(category);
-    } else {
-      vendors = v4TestVendorService.getAllV4TestVendors();
+      vendors = vendors.filter((v: any) => v.id === vendorId);
     }
+    if (category && category !== 'all') {
+      vendors = vendors.filter((v: any) => Array.isArray(v.categories) && v.categories.includes(category));
+    }
+
+    // Prefer only active vendors for the public list
+    vendors = vendors.filter((v: any) => v.isActiveOnThru === true || v.isActive === true || v.groceryEnabled === true);
 
     return NextResponse.json({
       success: true,
-      message: 'V4 test vendors fetched successfully',
+      message: 'Vendors fetched from Firestore',
       count: vendors.length,
-      vendors: vendors,
+      vendors,
       timestamp: new Date().toISOString(),
-      version: 'V4-CLEAN-TEST-VENDORS'
+      source: 'firestore'
     });
-
-    } catch (error) {
-      console.error('❌ Error fetching V4 test vendors:', error);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to fetch V4 test vendors',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }, { status: 500 });
-    }
+  } catch (error) {
+    console.error('❌ Error fetching vendors from Firestore:', error);
+    return NextResponse.json({
+      success: false,
+      error: 'Failed to fetch vendors',
+      message: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString()
+    }, { status: 500 });
+  }
 }
 
 // POST /api/test-vendors-v4 - Create V4 test vendors
-export async function POST(request: NextRequest) {
-  try {
-    console.log('🚀 Creating V4 test vendors...');
-    
-    const result = await v4TestVendorService.createV4TestVendors();
-    
-    return NextResponse.json({
-      ...result,
-      timestamp: new Date().toISOString(),
-      version: 'V4-CLEAN-TEST-VENDORS'
-    });
-
-    } catch (error) {
-      console.error('❌ Error creating V4 test vendors:', error);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to create V4 test vendors',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }, { status: 500 });
-    }
+// Management via this endpoint is disabled in production: vendors are sourced from Firestore.
+export async function POST() {
+  return NextResponse.json({ success: false, error: 'Vendor creation disabled; use Firestore admin flows.' }, { status: 405 });
 }
 
 // PUT /api/test-vendors-v4 - Update V4 test vendor
-export async function PUT(request: NextRequest) {
-  try {
-    const body = await request.json();
-    const { vendorId, updates } = body;
-
-    if (!vendorId) {
-      return NextResponse.json({
-        success: false,
-        error: 'Vendor ID is required'
-      }, { status: 400 });
-    }
-
-    const vendor = v4TestVendorService.getV4TestVendor(vendorId);
-    if (!vendor) {
-      return NextResponse.json({
-        success: false,
-        error: 'Vendor not found'
-      }, { status: 404 });
-    }
-
-    // Validate updates
-    const validation = v4TestVendorService.validateV4TestVendor({...vendor, ...updates});
-    if (!validation.valid) {
-      return NextResponse.json({
-        success: false,
-        error: 'Invalid vendor data',
-        validationErrors: validation.errors
-      }, { status: 400 });
-    }
-
-    console.log(`✅ Updated V4 test vendor: ${vendor.name}`);
-    
-    return NextResponse.json({
-      success: true,
-      message: `V4 test vendor ${vendor.name} updated successfully`,
-      vendor: {...vendor, ...updates},
-      timestamp: new Date().toISOString(),
-      version: 'V4-CLEAN-TEST-VENDORS'
-    });
-
-    } catch (error) {
-      console.error('❌ Error updating V4 test vendor:', error);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to update V4 test vendor',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }, { status: 500 });
-    }
+export async function PUT() {
+  return NextResponse.json({ success: false, error: 'Updates disabled on this endpoint.' }, { status: 405 });
 }
 
 // DELETE /api/test-vendors-v4 - Delete V4 test vendor
-export async function DELETE(request: NextRequest) {
-  try {
-    const url = new URL(request.url);
-    const vendorId = url.searchParams.get('vendorId');
-
-    if (!vendorId) {
-      return NextResponse.json({
-        success: false,
-        error: 'Vendor ID is required'
-      }, { status: 400 });
-    }
-
-    const vendor = v4TestVendorService.getV4TestVendor(vendorId);
-    if (!vendor) {
-      return NextResponse.json({
-        success: false,
-        error: 'Vendor not found'
-      }, { status: 404 });
-    }
-
-    console.log(`🗑️ Deleted V4 test vendor: ${vendor.name}`);
-    
-    return NextResponse.json({
-      success: true,
-      message: `V4 test vendor ${vendor.name} deleted successfully`,
-      vendorId: vendorId,
-      timestamp: new Date().toISOString(),
-      version: 'V4-CLEAN-TEST-VENDORS'
-    });
-
-    } catch (error) {
-      console.error('❌ Error deleting V4 test vendor:', error);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to delete V4 test vendor',
-        message: error instanceof Error ? error.message : 'Unknown error',
-        timestamp: new Date().toISOString()
-      }, { status: 500 });
-    }
+export async function DELETE() {
+  return NextResponse.json({ success: false, error: 'Deletion disabled on this endpoint.' }, { status: 405 });
 }
