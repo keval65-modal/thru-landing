@@ -125,17 +125,24 @@ function HomePageContent() {
     };
   }, [GOOGLE_MAPS_API_KEY]);
 
-  // Initialize autocomplete
+  // Initialize autocomplete - FIXED to extract coordinates directly
   React.useEffect(() => {
     if (isGoogleMapsScriptLoaded && GOOGLE_MAPS_API_KEY && startInputRef.current && !startAutocompleteRef.current) {
       try {
         startAutocompleteRef.current = new window.google.maps.places.Autocomplete(startInputRef.current);
         startAutocompleteRef.current.addListener("place_changed", () => {
           const place = startAutocompleteRef.current?.getPlace();
-          if (place && place.place_id && (place.formatted_address || place.name)) {
-            const newStartLocation = place.place_id; // Store place ID for Google Places
-            setSelectedStartLocation(newStartLocation);
-            setStartLocationQuery(place.formatted_address || place.name || "");
+          if (place && place.geometry?.location) {
+            // ✅ Extract coordinates directly from the place
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            const coordString = `${lat}, ${lng}`;
+            
+            console.log('✅ Place selected - extracted coordinates:', coordString);
+            
+            // Store as coordinate string for easy parsing later
+            setSelectedStartLocation(coordString);
+            setStartLocationQuery(place.formatted_address || place.name || coordString);
           }
         });
       } catch (error) {
@@ -159,10 +166,17 @@ function HomePageContent() {
         destAutocompleteRef.current = new window.google.maps.places.Autocomplete(destinationInputRef.current);
         destAutocompleteRef.current.addListener("place_changed", () => {
           const place = destAutocompleteRef.current?.getPlace();
-          if (place && place.place_id && (place.formatted_address || place.name)) {
-            const newDestination = place.place_id; // Store place ID for Google Places
-            setSelectedDestination(newDestination);
-            setDestinationQuery(place.formatted_address || place.name || "");
+          if (place && place.geometry?.location) {
+            // ✅ Extract coordinates directly from the place
+            const lat = place.geometry.location.lat();
+            const lng = place.geometry.location.lng();
+            const coordString = `${lat}, ${lng}`;
+            
+            console.log('✅ Place selected - extracted coordinates:', coordString);
+            
+            // Store as coordinate string for easy parsing later
+            setSelectedDestination(coordString);
+            setDestinationQuery(place.formatted_address || place.name || coordString);
           }
         });
       } catch (error) {
