@@ -751,10 +751,14 @@ function HomePageContent() {
       console.log('  Start location string:', selectedStartLocation);
       console.log('  Destination string:', selectedDestination);
       
-      // ✅ NEW: Try to parse coordinates directly first
+      // ✅ Flexible coordinate parsing - handles multiple formats
       const parseCoords = (str: string): { coordinates: { lat: number; lng: number }; address: string } | null => {
-        const match = str.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+        console.log('    Trying to parse:', str);
+        
+        // Try standard format: "18.475, 73.860"
+        let match = str.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
         if (match) {
+          console.log('    ✅ Matched standard format');
           return {
             coordinates: {
               lat: parseFloat(match[1]),
@@ -763,6 +767,21 @@ function HomePageContent() {
             address: str
           };
         }
+        
+        // Try format without space: "18.475,73.860"
+        match = str.match(/^(-?\d+\.?\d*),(-?\d+\.?\d*)$/);
+        if (match) {
+          console.log('    ✅ Matched no-space format');
+          return {
+            coordinates: {
+              lat: parseFloat(match[1]),
+              lng: parseFloat(match[2])
+            },
+            address: str
+          };
+        }
+        
+        console.log('    ❌ Not a coordinate format');
         return null;
       };
       
@@ -771,23 +790,25 @@ function HomePageContent() {
       
       // ✅ If not coordinates, try Google Places API
       if (!startDetails) {
-        console.log('  Fetching start details from Google Places...');
+        console.log('  📍 Not coordinates, trying Google Places API for start...');
         const placeDetails = await getPlaceDetails(selectedStartLocation);
         if (placeDetails) {
           startDetails = placeDetails as { coordinates: { lat: number; lng: number }; address: string };
+          console.log('  ✅ Got start coordinates from Google:', startDetails.coordinates);
         }
       } else {
-        console.log('  ✅ Parsed start coordinates:', startDetails.coordinates);
+        console.log('  ✅ Parsed start coordinates directly:', startDetails.coordinates);
       }
       
       if (!destDetails) {
-        console.log('  Fetching destination details from Google Places...');
+        console.log('  📍 Not coordinates, trying Google Places API for destination...');
         const placeDetails = await getPlaceDetails(selectedDestination);
         if (placeDetails) {
           destDetails = placeDetails as { coordinates: { lat: number; lng: number }; address: string };
+          console.log('  ✅ Got destination coordinates from Google:', destDetails.coordinates);
         }
       } else {
-        console.log('  ✅ Parsed destination coordinates:', destDetails.coordinates);
+        console.log('  ✅ Parsed destination coordinates directly:', destDetails.coordinates);
       }
 
       if (!startDetails || !destDetails) {
