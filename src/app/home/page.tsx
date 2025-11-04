@@ -138,11 +138,15 @@ function HomePageContent() {
             const lng = place.geometry.location.lng();
             const coordString = `${lat}, ${lng}`;
             
-            console.log('✅ Place selected - extracted coordinates:', coordString);
+            console.log('✅ START Place selected - extracted coordinates:', coordString);
             
-            // Store as coordinate string for easy parsing later
+            // Store ONLY coordinates for API use
             setSelectedStartLocation(coordString);
+            // Store formatted address separately for display
             setStartLocationQuery(place.formatted_address || place.name || coordString);
+            
+            console.log('✅ START selectedStartLocation set to:', coordString);
+            console.log('✅ START startLocationQuery set to:', place.formatted_address);
           }
         });
       } catch (error) {
@@ -150,15 +154,6 @@ function HomePageContent() {
       }
     }
   }, [isGoogleMapsScriptLoaded, GOOGLE_MAPS_API_KEY]);
-  
-  // ✅ Handle manual coordinate entry for start location
-  React.useEffect(() => {
-    const coordsMatch = startLocationQuery.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
-    if (coordsMatch) {
-      // User entered coordinates manually
-      setSelectedStartLocation(startLocationQuery);
-    }
-  }, [startLocationQuery]);
 
   React.useEffect(() => {
     if (isGoogleMapsScriptLoaded && GOOGLE_MAPS_API_KEY && destinationInputRef.current && !destAutocompleteRef.current) {
@@ -172,11 +167,15 @@ function HomePageContent() {
             const lng = place.geometry.location.lng();
             const coordString = `${lat}, ${lng}`;
             
-            console.log('✅ Place selected - extracted coordinates:', coordString);
+            console.log('✅ DEST Place selected - extracted coordinates:', coordString);
             
-            // Store as coordinate string for easy parsing later
+            // Store ONLY coordinates for API use
             setSelectedDestination(coordString);
+            // Store formatted address separately for display
             setDestinationQuery(place.formatted_address || place.name || coordString);
+            
+            console.log('✅ DEST selectedDestination set to:', coordString);
+            console.log('✅ DEST destinationQuery set to:', place.formatted_address);
           }
         });
       } catch (error) {
@@ -184,15 +183,6 @@ function HomePageContent() {
       }
     }
   }, [isGoogleMapsScriptLoaded, GOOGLE_MAPS_API_KEY]);
-  
-  // ✅ Handle manual coordinate entry for destination
-  React.useEffect(() => {
-    const coordsMatch = destinationQuery.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
-    if (coordsMatch) {
-      // User entered coordinates manually
-      setSelectedDestination(destinationQuery);
-    }
-  }, [destinationQuery]);
 
   // Handle current location
   const handleUseCurrentLocation = async () => {
