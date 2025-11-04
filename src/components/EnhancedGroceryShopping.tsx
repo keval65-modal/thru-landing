@@ -364,20 +364,20 @@ export default function EnhancedGroceryShopping({ userRoute, onOrderPlaced }: En
           </Card>
         )}
 
-        {/* Nearby Shops */}
-        {userRoute && (
+        {/* Nearby Shops - ONLY FOR FOOD/RESTAURANT ORDERING, NOT GROCERY! */}
+        {userRoute && !supportsGroceryProcessing && (
           <Card className="mb-6">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <MapPin className="h-5 w-5" />
-                Nearby Shops Along Your Route
+                Nearby Restaurants Along Your Route
               </CardTitle>
             </CardHeader>
             <CardContent>
               {shopsLoading ? (
                 <div className="text-center py-4">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
-                  <p className="text-gray-600">Finding shops along your route...</p>
+                  <p className="text-gray-600">Finding restaurants along your route...</p>
                 </div>
               ) : nearbyShops.length === 0 ? (
                 <div className="text-center py-8 text-gray-500">
@@ -391,7 +391,7 @@ export default function EnhancedGroceryShopping({ userRoute, onOrderPlaced }: En
                     Found {nearbyShops.length} {getStoreTypeDisplayName(storeType).toLowerCase()} shops along your route
                   </p>
                   {nearbyShops.map((shop) => (
-                    <div key={shop.id} className="flex items-center justify-between p-3 border rounded-lg">
+                    <div key={shop.id} className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50 cursor-pointer">
                       <div className="flex-1">
                         <h4 className="font-medium">{shop.name}</h4>
                         <p className="text-sm text-gray-600">{shop.address}</p>
@@ -421,6 +421,27 @@ export default function EnhancedGroceryShopping({ userRoute, onOrderPlaced }: En
                   ))}
                 </div>
               )}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Grocery Shopping Explanation - SHOW FOR GROCERY ONLY */}
+        {userRoute && supportsGroceryProcessing && (
+          <Card className="mb-6 bg-blue-50 border-blue-200">
+            <CardContent className="pt-6">
+              <div className="flex items-start gap-3">
+                <ShoppingCart className="h-5 w-5 text-blue-600 mt-0.5" />
+                <div>
+                  <h3 className="font-medium text-blue-900 mb-1">How Grocery Shopping Works</h3>
+                  <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
+                    <li>Add items you need to your cart below</li>
+                    <li>Click "Place Order" to send your list to nearby shops</li>
+                    <li>Shops along your route will respond with prices and availability</li>
+                    <li>Choose which shop you want to buy from</li>
+                    <li>Complete payment and pick up your items on your way!</li>
+                  </ol>
+                </div>
+              </div>
             </CardContent>
           </Card>
         )}

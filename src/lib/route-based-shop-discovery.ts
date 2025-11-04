@@ -138,10 +138,13 @@ export class RouteBasedShopDiscovery {
         const shopLng = vendor.location?.longitude
 
         if (shopLat && shopLng) {
+          // ✅ USE store_type from Supabase directly, don't derive from categories!
+          const storeType = (vendor.storeType || 'grocery') as StoreType
+          
           shops.push({
             id: vendor.id,
             name: vendor.name || 'Unknown Shop',
-            type: this.determineStoreType(vendor.categories || []),
+            type: storeType, // ✅ Use the actual store_type from database
             coordinates: { lat: shopLat, lng: shopLng },
             address: vendor.address || 'Address not available',
             categories: vendor.categories || [],
