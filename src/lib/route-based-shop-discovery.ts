@@ -213,14 +213,49 @@ export class RouteBasedShopDiscovery {
     transportMode: 'driving' | 'walking' | 'transit'
   ): Promise<RouteCalculationResult> {
     if (!this.directionsService) {
-      console.warn('⚠️ Google Maps Directions Service not available - returning empty result')
+      console.warn('⚠️ Google Maps Directions Service not available - using simple distance-based fallback')
+      
+      // FALLBACK: Show shops within maxDetourKm of route midpoint
+      const midpoint = {
+        lat: (startPoint.latitude + endPoint.latitude) / 2,
+        lng: (startPoint.longitude + endPoint.longitude) / 2
+      }
+      
+      const nearbyShops: RouteBasedShop[] = shops
+        .map(shop => {
+          const distanceToMidpoint = this.calculateDistance(
+            midpoint.lat, 
+            midpoint.lng, 
+            shop.coordinates.lat, 
+            shop.coordinates.lng
+          )
+          
+          return {
+            id: shop.id,
+            name: shop.name,
+            type: shop.type,
+            coordinates: shop.coordinates,
+            address: shop.address,
+            categories: shop.categories,
+            distanceFromRoute: distanceToMidpoint,
+            detourDistance: distanceToMidpoint,
+            routePosition: 0.5, // Assume midpoint
+            estimatedTime: Math.round(distanceToMidpoint * 3), // ~3 min per km
+            isOnRoute: distanceToMidpoint <= 1 // Within 1km is "on route"
+          }
+        })
+        .filter(shop => shop.distanceFromRoute <= maxDetourKm)
+        .sort((a, b) => a.distanceFromRoute - b.distanceFromRoute)
+      
+      console.log(`✅ Fallback mode: Found ${nearbyShops.length} shops within ${maxDetourKm}km`)
+      
       return {
-        shops: [],
+        shops: nearbyShops,
         routePolyline: '',
-        totalDistance: 0,
+        totalDistance: this.calculateDistance(startPoint.latitude, startPoint.longitude, endPoint.latitude, endPoint.longitude),
         totalDuration: 0,
         detourArea: {
-          center: { lat: startPoint.latitude, lng: startPoint.longitude },
+          center: midpoint,
           radius: maxDetourKm
         }
       }
