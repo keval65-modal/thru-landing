@@ -738,7 +738,7 @@ function HomePageContent() {
       console.log('  Destination string:', selectedDestination);
       
       // ✅ NEW: Try to parse coordinates directly first
-      const parseCoords = (str: string) => {
+      const parseCoords = (str: string): { coordinates: { lat: number; lng: number }; address: string } | null => {
         const match = str.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
         if (match) {
           return {
@@ -752,20 +752,26 @@ function HomePageContent() {
         return null;
       };
       
-      let startDetails = parseCoords(selectedStartLocation);
-      let destDetails = parseCoords(selectedDestination);
+      let startDetails: { coordinates: { lat: number; lng: number }; address: string } | null = parseCoords(selectedStartLocation);
+      let destDetails: { coordinates: { lat: number; lng: number }; address: string } | null = parseCoords(selectedDestination);
       
       // ✅ If not coordinates, try Google Places API
       if (!startDetails) {
         console.log('  Fetching start details from Google Places...');
-        startDetails = await getPlaceDetails(selectedStartLocation);
+        const placeDetails = await getPlaceDetails(selectedStartLocation);
+        if (placeDetails) {
+          startDetails = placeDetails as { coordinates: { lat: number; lng: number }; address: string };
+        }
       } else {
         console.log('  ✅ Parsed start coordinates:', startDetails.coordinates);
       }
       
       if (!destDetails) {
         console.log('  Fetching destination details from Google Places...');
-        destDetails = await getPlaceDetails(selectedDestination);
+        const placeDetails = await getPlaceDetails(selectedDestination);
+        if (placeDetails) {
+          destDetails = placeDetails as { coordinates: { lat: number; lng: number }; address: string };
+        }
       } else {
         console.log('  ✅ Parsed destination coordinates:', destDetails.coordinates);
       }
