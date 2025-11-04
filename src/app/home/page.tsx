@@ -127,11 +127,24 @@ function HomePageContent() {
 
   // Initialize autocomplete - FIXED to extract coordinates directly
   React.useEffect(() => {
+    console.log('🔧 START autocomplete effect running...');
+    console.log('  isGoogleMapsScriptLoaded:', isGoogleMapsScriptLoaded);
+    console.log('  GOOGLE_MAPS_API_KEY:', GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
+    console.log('  startInputRef.current:', startInputRef.current ? 'Present' : 'Missing');
+    console.log('  startAutocompleteRef.current:', startAutocompleteRef.current ? 'Already initialized' : 'Not initialized');
+    
     if (isGoogleMapsScriptLoaded && GOOGLE_MAPS_API_KEY && startInputRef.current && !startAutocompleteRef.current) {
       try {
+        console.log('🎯 Initializing START autocomplete...');
         startAutocompleteRef.current = new window.google.maps.places.Autocomplete(startInputRef.current);
+        
+        console.log('✅ START autocomplete created, adding listener...');
+        
         startAutocompleteRef.current.addListener("place_changed", () => {
+          console.log('🔔 START place_changed event fired!');
           const place = startAutocompleteRef.current?.getPlace();
+          console.log('  Place object:', place);
+          
           if (place && place.geometry?.location) {
             // ✅ Extract coordinates directly from the place
             const lat = place.geometry.location.lat();
@@ -147,11 +160,17 @@ function HomePageContent() {
             
             console.log('✅ START selectedStartLocation set to:', coordString);
             console.log('✅ START startLocationQuery set to:', place.formatted_address);
+          } else {
+            console.warn('⚠️ START place has no geometry:', place);
           }
         });
+        
+        console.log('✅ START autocomplete listener added');
       } catch (error) {
-        console.error("Error initializing start autocomplete:", error);
+        console.error("❌ Error initializing start autocomplete:", error);
       }
+    } else {
+      console.log('⏭️ Skipping START autocomplete initialization');
     }
   }, [isGoogleMapsScriptLoaded, GOOGLE_MAPS_API_KEY]);
 
