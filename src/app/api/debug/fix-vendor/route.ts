@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSupabaseClient } from '@/lib/supabase/client';
+import { createServiceSupabaseClient } from '@/lib/supabase/server';
 
 export async function POST(request: NextRequest) {
   try {
@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createServiceSupabaseClient();
     
     // Update the vendor
     const { data, error } = await supabase
@@ -53,7 +53,7 @@ export async function GET(request: NextRequest) {
       }, { status: 400 });
     }
 
-    const supabase = getSupabaseClient();
+    const supabase = createServiceSupabaseClient();
     
     let updates: any = {};
     
