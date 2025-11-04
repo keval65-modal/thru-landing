@@ -132,17 +132,26 @@ function HomePageContent() {
         startAutocompleteRef.current = new window.google.maps.places.Autocomplete(startInputRef.current);
         startAutocompleteRef.current.addListener("place_changed", () => {
           const place = startAutocompleteRef.current?.getPlace();
-          if (place && (place.formatted_address || place.name)) {
-            const newStartLocation = place.formatted_address || place.name || "";
+          if (place && place.place_id && (place.formatted_address || place.name)) {
+            const newStartLocation = place.place_id; // Store place ID for Google Places
             setSelectedStartLocation(newStartLocation);
-            setStartLocationQuery(newStartLocation);
+            setStartLocationQuery(place.formatted_address || place.name || "");
           }
         });
-    } catch (error) {
+      } catch (error) {
         console.error("Error initializing start autocomplete:", error);
       }
     }
   }, [isGoogleMapsScriptLoaded, GOOGLE_MAPS_API_KEY]);
+  
+  // ✅ Handle manual coordinate entry for start location
+  React.useEffect(() => {
+    const coordsMatch = startLocationQuery.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (coordsMatch) {
+      // User entered coordinates manually
+      setSelectedStartLocation(startLocationQuery);
+    }
+  }, [startLocationQuery]);
 
   React.useEffect(() => {
     if (isGoogleMapsScriptLoaded && GOOGLE_MAPS_API_KEY && destinationInputRef.current && !destAutocompleteRef.current) {
@@ -150,10 +159,10 @@ function HomePageContent() {
         destAutocompleteRef.current = new window.google.maps.places.Autocomplete(destinationInputRef.current);
         destAutocompleteRef.current.addListener("place_changed", () => {
           const place = destAutocompleteRef.current?.getPlace();
-          if (place && (place.formatted_address || place.name)) {
-            const newDestination = place.formatted_address || place.name || "";
+          if (place && place.place_id && (place.formatted_address || place.name)) {
+            const newDestination = place.place_id; // Store place ID for Google Places
             setSelectedDestination(newDestination);
-            setDestinationQuery(newDestination);
+            setDestinationQuery(place.formatted_address || place.name || "");
           }
         });
       } catch (error) {
@@ -161,6 +170,15 @@ function HomePageContent() {
       }
     }
   }, [isGoogleMapsScriptLoaded, GOOGLE_MAPS_API_KEY]);
+  
+  // ✅ Handle manual coordinate entry for destination
+  React.useEffect(() => {
+    const coordsMatch = destinationQuery.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (coordsMatch) {
+      // User entered coordinates manually
+      setSelectedDestination(destinationQuery);
+    }
+  }, [destinationQuery]);
 
   // Handle current location
   const handleUseCurrentLocation = async () => {
@@ -516,14 +534,31 @@ function HomePageContent() {
     }
   }, []);
 
-  // Get place details for selected suggestion
-  const getPlaceDetails = React.useCallback(async (placeId: string) => {
-    if (!window.google?.maps?.places) return null;
+  // Get place details for selected suggestion OR parse coordinates
+  const getPlaceDetails = React.useCallback(async (placeIdOrCoords: string) => {
+    // ✅ Check if it's coordinates in format "lat, lng"
+    const coordsMatch = placeIdOrCoords.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+    if (coordsMatch) {
+      const lat = parseFloat(coordsMatch[1]);
+      const lng = parseFloat(coordsMatch[2]);
+      console.log('✅ Parsed coordinates:', { lat, lng });
+      return {
+        name: `Location at ${lat}, ${lng}`,
+        address: `${lat}, ${lng}`,
+        coordinates: { lat, lng }
+      };
+    }
+    
+    // ✅ Otherwise, treat as Google Places ID
+    if (!window.google?.maps?.places) {
+      console.warn('⚠️ Google Maps not loaded, cannot get place details');
+      return null;
+    }
     
     return new Promise((resolve) => {
       const service = new window.google.maps.places.PlacesService(document.createElement('div'));
       const request = {
-        placeId: placeId,
+        placeId: placeIdOrCoords,
         fields: ['name', 'formatted_address', 'geometry']
       };
 
