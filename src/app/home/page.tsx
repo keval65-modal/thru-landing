@@ -727,17 +727,56 @@ function HomePageContent() {
   // Load food shops along route
   const loadFoodShops = React.useCallback(async () => {
     if (!selectedStartLocation || !selectedDestination) {
+      console.warn('⚠️ No start or destination selected');
       return;
     }
 
     setLoadingFoodShops(true);
     try {
-      // Get coordinates from selected locations
-      const startDetails = await getPlaceDetails(selectedStartLocation);
-      const destDetails = await getPlaceDetails(selectedDestination);
+      console.log('🔍 Loading food shops...');
+      console.log('  Start location string:', selectedStartLocation);
+      console.log('  Destination string:', selectedDestination);
+      
+      // ✅ NEW: Try to parse coordinates directly first
+      const parseCoords = (str: string) => {
+        const match = str.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
+        if (match) {
+          return {
+            coordinates: {
+              lat: parseFloat(match[1]),
+              lng: parseFloat(match[2])
+            },
+            address: str
+          };
+        }
+        return null;
+      };
+      
+      let startDetails = parseCoords(selectedStartLocation);
+      let destDetails = parseCoords(selectedDestination);
+      
+      // ✅ If not coordinates, try Google Places API
+      if (!startDetails) {
+        console.log('  Fetching start details from Google Places...');
+        startDetails = await getPlaceDetails(selectedStartLocation);
+      } else {
+        console.log('  ✅ Parsed start coordinates:', startDetails.coordinates);
+      }
+      
+      if (!destDetails) {
+        console.log('  Fetching destination details from Google Places...');
+        destDetails = await getPlaceDetails(selectedDestination);
+      } else {
+        console.log('  ✅ Parsed destination coordinates:', destDetails.coordinates);
+      }
 
       if (!startDetails || !destDetails) {
-        console.error('Could not get place details');
+        console.error('❌ Could not get place details');
+        toast({
+          title: "Location Error",
+          description: "Could not parse locations. Try format: 18.475, 73.860",
+          variant: "destructive",
+        });
         return;
       }
 
@@ -764,9 +803,14 @@ function HomePageContent() {
           title: "Food Shops Found!",
           description: `Discovered ${result.shops.length} food outlet${result.shops.length > 1 ? 's' : ''} along your route.`,
         });
+      } else {
+        toast({
+          title: "No Shops Found",
+          description: "Try increasing the detour distance or adjusting your route.",
+        });
       }
     } catch (error) {
-      console.error('Error loading food shops:', error);
+      console.error('❌ Error loading food shops:', error);
       toast({
         title: "Error",
         description: "Could not load food shops. Please try again.",
