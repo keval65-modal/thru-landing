@@ -311,9 +311,8 @@ function CartPageContent() {
         
         // Redirect to tracking or success page
         // For now, redirect to home or order tracking
-        setTimeout(() => {
-            router.push(`/order-tracking/${orderId}`);
-        }, 1000);
+        // Redirect to tracking or success page
+        router.push(`/order-tracking/${orderId}`);
       } else {
         throw new Error(result.error);
       }
