@@ -21,6 +21,10 @@ const VendorPortionSchema = z.object({
   vendorName: z.string(),
   vendorAddress: z.string().optional().nullable(),
   vendorType: z.string().optional().nullable(),
+  vendorLocation: z.object({
+    latitude: z.number(),
+    longitude: z.number(),
+  }).optional().nullable(),
   status: z.string(),
   vendorSubtotal: z.number(),
   items: z.array(OrderItemSchema),
