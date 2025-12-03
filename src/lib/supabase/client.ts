@@ -28,3 +28,17 @@ export function isSupabaseConfigured(): boolean {
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+

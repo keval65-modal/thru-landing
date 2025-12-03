@@ -1,71 +1,94 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { SupabaseOrderService } from '@/lib/supabase/order-service'
+'use server'
 
-/**
- * POST /api/orders/create
- * Create a new production order (quote-based workflow)
- * NOW USING SUPABASE! 🎉
- */
-export async function POST(request: NextRequest) {
-  try {
-    const body = await request.json()
-    const { userId, items, route, detourPreferences } = body
+import { NextResponse } from 'next/server'
+import { z } from 'zod'
 
-    console.log('📝 Creating order in Supabase:', { userId, itemCount: items?.length })
+import { createServiceSupabaseClient } from '@/lib/supabase/server'
 
-    // Validate required fields
-    if (!userId || !items || !route) {
-      return NextResponse.json({
-        success: false,
-        error: 'Missing required fields: userId, items, route'
-      }, { status: 400 })
-    }
+const OrderItemSchema = z.object({
+  itemId: z.string(),
+  name: z.string(),
+  quantity: z.number(),
+  pricePerItem: z.number(),
+  totalPrice: z.number(),
+  imageUrl: z.string().optional().nullable(),
+  details: z.string().optional().nullable(),
+  dataAiHint: z.string().optional().nullable(),
+})
 
-    // Validate items
-    if (!Array.isArray(items) || items.length === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'Items must be a non-empty array'
-      }, { status: 400 })
-    }
+const VendorPortionSchema = z.object({
+  vendorId: z.string(),
+  vendorName: z.string(),
+  vendorAddress: z.string().optional().nullable(),
+  vendorType: z.string().optional().nullable(),
+  status: z.string(),
+  vendorSubtotal: z.number(),
+  items: z.array(OrderItemSchema),
+  prepTime: z.number().optional(),
+})
 
-    // Create order in Supabase
-    const result = await SupabaseOrderService.createOrder({
-      userId,
-      items,
-      route,
-      detourPreferences: detourPreferences || {
-        maxDetourDistance: 5,
-        preferredStoreTypes: ['grocery'],
-        singleStorePreferred: true
-      }
+const OrderSchema = z.object({
+  orderId: z.string(),
+  createdAt: z.string().optional(),
+  customerInfo: z
+    .object({
+      id: z.string().optional(),
+      name: z.string().optional(),
+      phoneNumber: z.string().optional(),
     })
+    .optional(),
+  tripStartLocation: z.string().optional().nullable(),
+  tripDestination: z.string().optional().nullable(),
+  overallStatus: z.string(),
+  paymentStatus: z.string(),
+  grandTotal: z.number(),
+  platformFee: z.number().optional(),
+  paymentGatewayFee: z.number().optional(),
+  vendorPortions: z.array(VendorPortionSchema).min(1),
+  vendorIds: z.array(z.string()).min(1),
+})
 
-    if (!result.success) {
-      return NextResponse.json({
-        success: false,
-        error: result.error
-      }, { status: 500 })
+export async function POST(request: Request) {
+  try {
+    const json = await request.json()
+    const payload = OrderSchema.parse(json)
+
+    const supabase = createServiceSupabaseClient()
+
+    const { data, error } = await supabase
+      .from('placed_orders')
+      .insert({
+        order_id: payload.orderId,
+        created_at: payload.createdAt ?? new Date().toISOString(),
+        customer_info: payload.customerInfo ?? null,
+        trip_start_location: payload.tripStartLocation ?? null,
+        trip_destination: payload.tripDestination ?? null,
+        overall_status: payload.overallStatus,
+        payment_status: payload.paymentStatus,
+        grand_total: payload.grandTotal,
+        platform_fee: payload.platformFee ?? 0,
+        payment_gateway_fee: payload.paymentGatewayFee ?? 0,
+        vendor_portions: payload.vendorPortions,
+        vendor_ids: payload.vendorIds,
+      })
+      .select('order_id')
+      .single()
+
+    if (error) {
+      console.error('[orders:create] Supabase insert failed:', error)
+      return NextResponse.json(
+        { success: false, error: error.message ?? 'Failed to store order.' },
+        { status: 500 }
+      )
     }
-
-    console.log('✅ Order created in Supabase:', result.orderId)
 
     return NextResponse.json({
       success: true,
-      orderId: result.orderId,
-      message: 'Order created in Supabase successfully! Waiting for vendor quotes.',
-      status: 'pending_quotes',
-      database: 'supabase'
+      orderId: data.order_id,
     })
-
   } catch (error) {
-    console.error('❌ Error in create order API:', error)
-    return NextResponse.json({
-      success: false,
-      error: error instanceof Error ? error.message : 'Internal server error'
-    }, { status: 500 })
+    console.error('[orders:create] Unexpected error:', error)
+    const message = error instanceof Error ? error.message : 'Unexpected error'
+    return NextResponse.json({ success: false, error: message }, { status: 500 })
   }
 }
-
-
-

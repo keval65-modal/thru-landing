@@ -257,20 +257,6 @@ export default function RouteMap({
 
   return (
     <>
-      {GOOGLE_MAPS_API_KEY && (
-        <Script
-          id="google-maps-route-script"
-          src={`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places&callback=initRouteMapCallback`}
-          strategy="afterInteractive"
-          async
-          defer
-          onError={() => {
-            console.error("[RouteMap] Google Maps script failed to load");
-            setMapError("Failed to load Google Maps");
-          }}
-        />
-      )}
-      
       <div className={`aspect-video w-full rounded-lg overflow-hidden bg-muted shadow ${className}`}>
         {!isGoogleMapsLoaded ? (
           <div className="w-full h-full flex items-center justify-center">

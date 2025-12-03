@@ -187,3 +187,16 @@ WHERE is_active = true
   AND location IS NOT NULL
   AND NOT (ST_X(location::geometry) = 0 AND ST_Y(location::geometry) = 0);
 
+
+
+
+
+
+
+
+
+
+
+
+
+

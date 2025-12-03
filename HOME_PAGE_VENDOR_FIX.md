@@ -184,3 +184,16 @@ deleteAllFirebaseVendors();
 
 **All future vendors registered via the vendor app will automatically appear on both home and grocery pages!** 🚀
 
+
+
+
+
+
+
+
+
+
+
+
+
+

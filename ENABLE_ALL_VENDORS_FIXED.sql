@@ -143,3 +143,16 @@ SELECT
 FROM vendors
 WHERE name LIKE '%Zeo%' AND grocery_enabled = true;
 
+
+
+
+
+
+
+
+
+
+
+
+
+

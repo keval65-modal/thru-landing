@@ -191,3 +191,16 @@ ORDER BY total DESC;
 -- ✅ VALIDATE location on insert/update
 -- ✅ Have proper indexes for fast queries
 
+
+
+
+
+
+
+
+
+
+
+
+
+

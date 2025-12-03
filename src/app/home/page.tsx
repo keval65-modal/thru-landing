@@ -29,7 +29,9 @@ import {
   Trash2,
   Clock,
   Calendar,
-  Package
+  Package,
+  Plus,
+  Minus
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -42,10 +44,12 @@ import { purchasePatternTracker } from "@/lib/purchase-pattern-tracker";
 import { VendorRequestPayload, AggregatedItemOffer } from "@/types/vendor-requests";
 import { enhancedOrderService } from "@/lib/enhanced-order-service";
 import { routeBasedShopDiscovery, RoutePoint } from "@/lib/route-based-shop-discovery";
+import { useFoodCart } from "@/hooks/useFoodCart";
 
 function HomePageContent() {
   const router = useRouter();
   const { toast } = useToast();
+  const { items: cartItems, addToCart, updateQuantity } = useFoodCart();
 
   // Location states
   const [startLocationQuery, setStartLocationQuery] = React.useState("");
@@ -90,6 +94,12 @@ function HomePageContent() {
   const [prepTimeFilter, setPrepTimeFilter] = React.useState<string>("all");
   const [foodShops, setFoodShops] = React.useState<any[]>([]);
   const [loadingFoodShops, setLoadingFoodShops] = React.useState(false);
+
+  // Menu states
+  const [selectedShopMenu, setSelectedShopMenu] = React.useState<any>(null);
+  const [menuItems, setMenuItems] = React.useState<any[]>([]);
+  const [loadingMenu, setLoadingMenu] = React.useState(false);
+  const [showMenuDialog, setShowMenuDialog] = React.useState(false);
 
   // Google Maps states
   const [isGoogleMapsScriptLoaded, setIsGoogleMapsScriptLoaded] = React.useState(false);
@@ -218,8 +228,14 @@ function HomePageContent() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
+        const coordString = `${latitude}, ${longitude}`;
         
-        // Try to get place name using reverse geocoding
+        console.log('📍 Current location coordinates:', coordString);
+        
+        // ALWAYS store coordinates in selectedStartLocation
+        setSelectedStartLocation(coordString);
+        
+        // Try to get place name using reverse geocoding for DISPLAY ONLY
         if (window.google?.maps) {
           const geocoder = new window.google.maps.Geocoder();
           const latlng = { lat: latitude, lng: longitude };
@@ -237,23 +253,20 @@ function HomePageContent() {
             
             if (results && results.length > 0) {
               const placeName = results[0].formatted_address || results[0].address_components?.[0]?.long_name || 'Current Location';
-              setStartLocationQuery(placeName);
-              setSelectedStartLocation(placeName);
+              setStartLocationQuery(placeName); // Show readable name
+              console.log('✅ Current location display name:', placeName);
             } else {
-              // Fallback to coordinates if geocoding fails
-              setStartLocationQuery(`${latitude}, ${longitude}`);
-              setSelectedStartLocation(`${latitude}, ${longitude}`);
+              // Show coordinates if geocoding fails
+              setStartLocationQuery(coordString);
             }
           } catch (error) {
             console.error("Error with reverse geocoding:", error);
-            // Fallback to coordinates
-            setStartLocationQuery(`${latitude}, ${longitude}`);
-            setSelectedStartLocation(`${latitude}, ${longitude}`);
+            // Show coordinates if geocoding fails
+            setStartLocationQuery(coordString);
           }
         } else {
-          // Fallback to coordinates if Google Maps not loaded
-          setStartLocationQuery(`${latitude}, ${longitude}`);
-          setSelectedStartLocation(`${latitude}, ${longitude}`);
+          // Show coordinates if Google Maps not loaded
+          setStartLocationQuery(coordString);
         }
         
         setIsFetchingCurrentLocation(false);
@@ -870,6 +883,40 @@ function HomePageContent() {
       setLoadingFoodShops(false);
     }
   }, [selectedStartLocation, selectedDestination, startLocationQuery, destinationQuery, maxDetourKm, toast]);
+
+  // Load menu for a shop
+  const loadShopMenu = React.useCallback(async (shop: any) => {
+    setSelectedShopMenu(shop);
+    setLoadingMenu(true);
+    setShowMenuDialog(true);
+    
+    try {
+      const response = await fetch(`/api/menu/${shop.id}`);
+      const data = await response.json();
+      
+      if (response.ok) {
+        setMenuItems(data.items || []);
+        if (data.items.length === 0) {
+          toast({
+            title: "No Menu Yet",
+            description: `${shop.name} hasn't uploaded their menu yet.`,
+          });
+        }
+      } else {
+        throw new Error(data.error);
+      }
+    } catch (error) {
+      console.error('Error loading menu:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load menu. Please try again.",
+        variant: "destructive",
+      });
+      setMenuItems([]);
+    } finally {
+      setLoadingMenu(false);
+    }
+  }, [toast]);
 
   // Load food shops when route changes or when food tab becomes active
   React.useEffect(() => {
@@ -1650,7 +1697,11 @@ function HomePageContent() {
                                   </div>
                                 )}
                               </div>
-                              <Button size="sm" className="ml-4">
+                              <Button 
+                                size="sm" 
+                                className="ml-4"
+                                onClick={() => loadShopMenu(shop)}
+                              >
                                 <Utensils className="h-4 w-4 mr-2" />
                                 View Menu
                               </Button>
@@ -1781,6 +1832,159 @@ function HomePageContent() {
               </Card>
             )}
           </main>
+
+          {/* Menu Dialog */}
+          <Dialog open={showMenuDialog} onOpenChange={setShowMenuDialog}>
+            <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle className="text-2xl">{selectedShopMenu?.name} - Menu</DialogTitle>
+              </DialogHeader>
+              <div className="flex-1 overflow-y-auto">
+                {loadingMenu ? (
+                  <div className="flex justify-center items-center h-64">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                  </div>
+                ) : menuItems.length === 0 ? (
+                  <div className="text-center py-12">
+                    <Utensils className="h-16 w-16 mx-auto mb-4 text-muted-foreground" />
+                    <p className="text-lg text-muted-foreground">
+                      No menu items available yet
+                    </p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {selectedShopMenu?.name} hasn't uploaded their menu
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-6">
+                    {Object.entries(
+                      menuItems.reduce((acc: any, item: any) => {
+                        const category = item.category || 'Other';
+                        if (!acc[category]) acc[category] = [];
+                        acc[category].push(item);
+                        return acc;
+                      }, {})
+                    ).map(([category, items]: [string, any]) => (
+                      <div key={category}>
+                        <h3 className="text-lg font-semibold mb-3 sticky top-0 bg-background py-2">
+                          {category}
+                        </h3>
+                        <div className="space-y-3">
+                          {items.map((item: any) => {
+                            const cartItem = cartItems.get(item.id);
+                            const quantity = cartItem?.quantity || 0;
+                            
+                            return (
+                              <Card key={item.id} className="p-4">
+                                <div className="flex justify-between items-start gap-4">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <h4 className="font-semibold">{item.name}</h4>
+                                      {item.is_veg && (
+                                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded">
+                                          VEG
+                                        </span>
+                                      )}
+                                    </div>
+                                    {item.description && (
+                                      <p className="text-sm text-muted-foreground mb-2">
+                                        {item.description}
+                                      </p>
+                                    )}
+                                    <p className="text-lg font-bold text-primary">
+                                      ₹{item.price}
+                                    </p>
+                                    {item.preparation_time && (
+                                      <p className="text-xs text-muted-foreground mt-1">
+                                        ⏱️ {item.preparation_time} mins
+                                      </p>
+                                    )}
+                                  </div>
+                                  
+                                  <div className="flex flex-col items-end gap-2">
+                                    {item.image_url && (
+                                      <img
+                                        src={item.image_url}
+                                        alt={item.name}
+                                        className="w-24 h-24 object-cover rounded-lg"
+                                      />
+                                    )}
+                                    
+                                    {quantity === 0 ? (
+                                      <Button
+                                        size="sm"
+                                        onClick={() => {
+                                          addToCart(item, selectedShopMenu!);
+                                          toast({
+                                            title: "Added to cart",
+                                            description: `${item.name} added to your cart`,
+                                          });
+                                        }}
+                                        className="w-full min-w-[100px]">
+                                        Add to Cart
+                                      </Button>
+                                    ) : (
+                                      <div className="flex items-center gap-2 bg-secondary/50 rounded-lg p-1">
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 hover:bg-background rounded-md"
+                                          onClick={() => updateQuantity(item.id, quantity - 1)}
+                                        >
+                                          {quantity === 1 ? (
+                                            <Trash2 className="h-3 w-3 text-destructive" />
+                                          ) : (
+                                            <Minus className="h-3 w-3" />
+                                          )}
+                                        </Button>
+                                        <span className="text-sm font-medium w-6 text-center">{quantity}</span>
+                                        <Button
+                                          variant="ghost"
+                                          size="icon"
+                                          className="h-7 w-7 hover:bg-background rounded-md"
+                                          onClick={() => updateQuantity(item.id, quantity + 1)}
+                                        >
+                                          <Plus className="h-3 w-3" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </Card>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {/* Cart Footer */}
+              {Array.from(cartItems.values()).length > 0 && (
+                <div className="sticky bottom-0 border-t bg-background p-4 mt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm text-muted-foreground">
+                        {Array.from(cartItems.values()).reduce((sum, item) => sum + item.quantity, 0)} items
+                      </p>
+                      <p className="text-lg font-bold">
+                        ₹{Array.from(cartItems.values()).reduce((sum, item) => sum + item.totalPrice, 0)}
+                      </p>
+                    </div>
+                    <Button 
+                      size="lg"
+                      onClick={() => {
+                        setShowMenuDialog(false);
+                        router.push('/cart');
+                      }}
+                      className="min-w-[140px]">
+                      View Cart
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </DialogContent>
+          </Dialog>
 
       <BottomNav />
     </div>

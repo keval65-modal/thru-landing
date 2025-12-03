@@ -51,3 +51,16 @@ WHERE (grocery_enabled = true OR store_type = 'grocery')
   AND is_active = true
 ORDER BY created_at DESC;
 
+
+
+
+
+
+
+
+
+
+
+
+
+

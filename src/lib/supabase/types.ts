@@ -60,6 +60,56 @@ export interface Database {
           quote_deadline?: string | null
         }
       }
+      placed_orders: {
+        Row: {
+          id: string
+          order_id: string
+          created_at: string
+          updated_at: string
+          customer_info: Json | null
+          trip_start_location: string | null
+          trip_destination: string | null
+          overall_status: string
+          payment_status: string
+          grand_total: number
+          platform_fee: number
+          payment_gateway_fee: number
+          vendor_portions: Json
+          vendor_ids: string[]
+        }
+        Insert: {
+          id?: string
+          order_id: string
+          created_at?: string
+          updated_at?: string
+          customer_info?: Json | null
+          trip_start_location?: string | null
+          trip_destination?: string | null
+          overall_status?: string
+          payment_status?: string
+          grand_total?: number
+          platform_fee?: number
+          payment_gateway_fee?: number
+          vendor_portions?: Json
+          vendor_ids?: string[]
+        }
+        Update: {
+          id?: string
+          order_id?: string
+          created_at?: string
+          updated_at?: string
+          customer_info?: Json | null
+          trip_start_location?: string | null
+          trip_destination?: string | null
+          overall_status?: string
+          payment_status?: string
+          grand_total?: number
+          platform_fee?: number
+          payment_gateway_fee?: number
+          vendor_portions?: Json
+          vendor_ids?: string[]
+        }
+      }
       vendors: {
         Row: {
           id: string
@@ -222,6 +272,20 @@ export interface Database {
     }
   }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

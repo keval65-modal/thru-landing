@@ -470,24 +470,6 @@ function PlanTripStep5PageContent() {
 
   return (
     <>
-    {GOOGLE_MAPS_API_KEY && (
-        <Script
-          id="google-maps-script-step5"
-          src={`https://maps.googleapis.com/maps/api/js?key=${GOOGLE_MAPS_API_KEY}&libraries=places,marker,directions`}
-          strategy="afterInteractive"
-          async
-          defer
-          onLoad={() => {
-            console.log("Step 5: Google Maps script loaded.");
-            setIsMapScriptLoaded(true);
-          }}
-          onError={(e) => {
-            console.error("Step 5: Google Maps script failed to load.", e);
-            setMapError("Failed to load Google Maps script. Map functionality will be limited.");
-            setIsMapScriptLoaded(false);
-          }}
-        />
-      )}
     <div className="flex min-h-screen flex-col bg-background">
       <div className="bg-primary text-primary-foreground p-4 shadow-md sticky top-0 z-20">
         <div className="flex items-center justify-between mb-4">

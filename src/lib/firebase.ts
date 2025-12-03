@@ -9,15 +9,13 @@
  */
 
 import { getAuth, PhoneAuthProvider, signInWithPhoneNumber, RecaptchaVerifier, Auth, User } from 'firebase/auth';
-import { getFirestore } from 'firebase/firestore';
 import { firebaseApp } from './firebaseApp';
 
 let auth: Auth | null = null;
-let db: any = null;
+const db: any = null;
 try {
   if (firebaseApp) {
     auth = getAuth(firebaseApp);
-    db = getFirestore(firebaseApp);
   }
 } catch (error) {
   console.error('❌ Firebase initialization failed:', error);
@@ -98,7 +96,7 @@ export const verifyOTP = async (verificationId: string, otp: string) => {
   }
 };
 
-// Export Firebase instances
+// Export Firebase instances (db intentionally null – Firestore disabled)
 export { auth, db };
 
 // Extend Window interface for reCAPTCHA

@@ -425,3 +425,16 @@ Users can now see ALL your vendors with their exact locations and place orders!
 
 **Ready to start receiving orders!** 🚀
 
+
+
+
+
+
+
+
+
+
+
+
+
+

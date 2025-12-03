@@ -407,3 +407,16 @@ UPDATE vendors SET grocery_enabled = true WHERE id = 'zeos-id';
 
 🎉 **Done!**
 
+
+
+
+
+
+
+
+
+
+
+
+
+

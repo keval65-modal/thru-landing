@@ -107,26 +107,10 @@ function OTPPageContent() {
       const phoneToCheck = user.phoneNumber || phoneNumber || '';
       
       if (loginContext === 'login') {
-        // For login, check if user exists and redirect accordingly (server, with client fallback)
         const userExistsResult = await checkUserExistsAction(phoneToCheck);
         if (userExistsResult.success && userExistsResult.userId) {
           router.push('/home');
         } else {
-          // Fallback: try client Firestore in case server action couldn't access Admin SDK
-          try {
-            const { db } = await import('@/lib/firebase');
-            if (db) {
-              const { doc, getDoc } = await import('firebase/firestore');
-              const snap = await getDoc(doc(db, 'users', phoneToCheck));
-              if (snap.exists()) {
-                router.push('/home');
-                return;
-              }
-            }
-          } catch (_) {
-            // Ignore fallback errors; proceed to profile
-          }
-          // User doesn't exist, redirect to create profile
           router.push(`/create-profile?phone=${encodeURIComponent(phoneToCheck)}`);
         }
       } else { // context === 'signup' or default to signup flow

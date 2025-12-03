@@ -8,376 +8,513 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import BottomNav from "@/components/layout/bottom-nav";
 import { useToast } from "@/hooks/use-toast";
 import {
   ChevronLeft,
   MapPin,
   ShoppingCart,
-  XCircle,
-  Check,
   Loader2,
-  Home
+  Minus,
+  Plus,
+  X,
+  Check
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { consumerOrderService } from "@/lib/consumer-order-service";
+import { PlacedOrder, VendorOrderPortion } from "@/lib/orderModels";
 
-// Interfaces (consistent with other steps)
-interface Item {
-  id: string;
-  name: string;
-  category: string; 
-  imageUrl?: string;
-  dataAiHint?: string;
-  details?: string;
-  price: number;
-  originalPrice?: number;
-  vendorId?: string; 
-}
-
-interface Vendor {
-  id: string;
-  name: string;
-  type: string;
-  imageUrl?: string;
-  dataAiHint?: string;
-  categories?: string[];
-  address?: string;
-}
-
-// Cart item structure derived from finalVendorPlan (from Step 3) or finalItemsForCart
+// Interfaces
 interface CartVendorItem {
   itemId: string;
   quantity: number;
-  name?: string; // Will be populated from masterItemsMap
-  price?: number; // Will be populated from masterItemsMap
-  imageUrl?: string; // Will be populated from masterItemsMap
-  dataAiHint?: string; // Will be populated from masterItemsMap
-  details?: string; // Will be populated from masterItemsMap
+  name?: string;
+  price?: number;
+  imageUrl?: string;
+  dataAiHint?: string;
+  details?: string;
 }
 
 interface CartVendorGroup {
-  vendorInfo: Vendor;
+  vendorInfo: {
+    id: string;
+    name: string;
+    address?: string;
+    type?: string;
+  };
   items: CartVendorItem[];
   vendorSubtotal: number;
 }
-
 
 function CartPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { toast } = useToast();
 
-  const [startLocation, setStartLocation] = React.useState<string | null>(null);
-  const [destination, setDestination] = React.useState<string | null>(null);
   const [cartVendorGroups, setCartVendorGroups] = React.useState<CartVendorGroup[]>([]);
   const [overallSubtotal, setOverallSubtotal] = React.useState(0);
   const [isLoading, setIsLoading] = React.useState(true);
-  
-  // Store raw strings for back navigation or re-passing
-  const [rawSelectedVendorIdsString, setRawSelectedVendorIdsString] = React.useState<string>("");
-  const [rawFinalItemsForCartString, setRawFinalItemsForCartString] = React.useState<string>("");
-  const [rawMasterItemsListString, setRawMasterItemsListString] = React.useState<string>("[]");
-  const [rawMaxDetourKm, setRawMaxDetourKm] = React.useState<string>("5");
-  // Params for Step 2 rehydration
-  const [rawSelectedGlobalItemsData, setRawSelectedGlobalItemsData] = React.useState<string>("{}");
-  const [rawSelectedShopSpecificItemsData, setRawSelectedShopSpecificItemsData] = React.useState<string>("{}");
-  const [rawSelectedGlobalItemsQuantities, setRawSelectedGlobalItemsQuantities] = React.useState<string>("{}");
-  const [rawSelectedShopSpecificItemsQuantities, setRawSelectedShopSpecificItemsQuantities] = React.useState<string>("{}");
+  const [isPaymentOpen, setIsPaymentOpen] = React.useState(false);
+  const [paymentMethod, setPaymentMethod] = React.useState("gpay");
+  const [isPlacingOrder, setIsPlacingOrder] = React.useState(false);
+  const [startLocation, setStartLocation] = React.useState<string | null>(null);
+  const [destination, setDestination] = React.useState<string | null>(null);
 
-
+  // Load cart data
   React.useEffect(() => {
-    const start = searchParams.get("start");
-    const dest = searchParams.get("destination");
-    const vendorIdsStr = searchParams.get("selectedVendorIds"); 
-    const finalItemsStr = searchParams.get("finalItemsForCart"); 
-    const subtotalFromStep3 = searchParams.get("cartSubtotal"); 
-    const masterItemsStr = searchParams.get("masterItemsListString") || "[]";
-    const detourStr = searchParams.get("maxDetourKm") || "5";
+    const loadCart = () => {
+      try {
+        // Try loading from URL params first (Plan Trip flow)
+        const finalItemsStr = searchParams.get("finalItemsForCart");
+        const vendorIdsStr = searchParams.get("selectedVendorIds");
+        const masterItemsStr = searchParams.get("masterItemsListString");
+        const start = searchParams.get("start");
+        const dest = searchParams.get("destination");
 
-    // For Step 2 rehydration if going back far
-    setRawSelectedGlobalItemsData(searchParams.get("selectedGlobalItemsData") || "{}");
-    setRawSelectedShopSpecificItemsData(searchParams.get("selectedShopSpecificItemsData") || "{}");
-    setRawSelectedGlobalItemsQuantities(searchParams.get("selectedGlobalItemsQuantities") || "{}");
-    setRawSelectedShopSpecificItemsQuantities(searchParams.get("selectedShopSpecificItemsQuantities") || "{}");
+        if (start) setStartLocation(start);
+        if (dest) setDestination(dest);
 
+        if (finalItemsStr && vendorIdsStr && masterItemsStr) {
+          const finalItemsByVendor = JSON.parse(finalItemsStr);
+          const masterItemsList = JSON.parse(masterItemsStr);
+          const masterItemsMap = new Map<string, any>(masterItemsList.map((item: any) => [item.id, item]));
+          const vendorIds = vendorIdsStr.split(',');
 
-    setRawSelectedVendorIdsString(vendorIdsStr || "");
-    setRawFinalItemsForCartString(finalItemsStr || "");
-    setRawMasterItemsListString(masterItemsStr);
-    setRawMaxDetourKm(detourStr);
+          const groups: CartVendorGroup[] = [];
+          let total = 0;
 
+          vendorIds.forEach((vendorId: string) => {
+            const items = finalItemsByVendor[vendorId] || [];
+            const displayItems: CartVendorItem[] = [];
+            let vendorTotal = 0;
 
-    if (!start || !dest || !vendorIdsStr || !finalItemsStr || !subtotalFromStep3) {
-      setIsLoading(false);
-      // Avoid showing error if it's just an empty cart state without parameters
-      if (start || dest || vendorIdsStr || finalItemsStr || subtotalFromStep3) { 
-        toast({ title: "Error", description: "Cart details are incomplete or invalid.", variant: "destructive" });
-      }
-      return;
-    }
-    
-    setStartLocation(start);
-    setDestination(dest);
+            items.forEach((item: any) => {
+              const masterItem = masterItemsMap.get(item.itemId);
+              if (masterItem) {
+                const price = masterItem.price || 0;
+                displayItems.push({
+                  itemId: item.itemId,
+                  quantity: item.quantity,
+                  name: masterItem.name,
+                  price: price,
+                  imageUrl: masterItem.imageUrl,
+                  details: masterItem.details
+                });
+                vendorTotal += price * item.quantity;
+              }
+            });
 
-    try {
-      // finalItemsForCart is expected as: Record<string, Array<{itemId: string, quantity: number}>>
-      const finalItemsByVendor: Record<string, Array<{itemId: string, quantity: number}>> = JSON.parse(finalItemsStr);
-      const masterItemsList: Item[] = JSON.parse(masterItemsStr);
-      const masterItemsMap = new Map(masterItemsList.map(item => [item.id, item]));
-
-      // selectedVendorIds is a comma-separated string of vendor IDs
-      const finalSelectedVendorIds: string[] = vendorIdsStr.split(',');
-
-      let newOverallSubtotal = 0;
-      const newCartVendorGroups: CartVendorGroup[] = [];
-
-      finalSelectedVendorIds.forEach(vendorId => {
-        // We need vendor info. Ideally, this would be part of finalItemsForCart or another param.
-        // For now, let's try to get it from masterItemsList if items have vendorId, or make a generic one.
-        // This part needs robust data from Step 3.
-        let vendorInfo: Vendor = { id: vendorId, name: `Vendor ${vendorId.substring(0,6)}`, type: "Store", categories: [], address: "Address unavailable" };
-        // If we passed a full vendor plan from step 3, we could get vendorInfo from there.
-        // For now, we'll rely on items in masterItemsList potentially having vendorId to infer type.
-        
-        const itemsForThisVendor = finalItemsByVendor[vendorId] || [];
-        const itemsToDisplay: CartVendorItem[] = [];
-        let currentVendorSubtotal = 0;
-
-        itemsForThisVendor.forEach(cartEntry => {
-          const masterItem = masterItemsMap.get(cartEntry.itemId);
-          if (masterItem) {
-            const displayItem: CartVendorItem = {
-              itemId: cartEntry.itemId,
-              quantity: cartEntry.quantity,
-              name: masterItem.name,
-              price: masterItem.price,
-              imageUrl: masterItem.imageUrl,
-              dataAiHint: masterItem.dataAiHint,
-              details: masterItem.details,
-            };
-            itemsToDisplay.push(displayItem);
-            currentVendorSubtotal += (masterItem.price || 0) * cartEntry.quantity;
-            
-            // Attempt to refine vendorInfo type based on first item from this vendor
-            if (vendorInfo.type === "Store" && masterItem.category) {
-                if (masterItem.category === "takeout") vendorInfo.type = "Restaurant/Cafe";
-                else if (masterItem.category === "grocery") vendorInfo.type = "Grocery Store";
-                else if (masterItem.category === "medical") vendorInfo.type = "Pharmacy";
-                // Add more mappings as needed
+            if (displayItems.length > 0) {
+              groups.push({
+                vendorInfo: { id: vendorId, name: `Vendor ${vendorId.substring(0,6)}`, type: "Store" }, // Placeholder name if not passed
+                items: displayItems,
+                vendorSubtotal: vendorTotal
+              });
+              total += vendorTotal;
             }
+          });
 
-          } else {
-            console.warn(`Cart: Master item with ID ${cartEntry.itemId} not found for vendor ${vendorId}. Skipping.`);
-          }
-        });
-        
-        if (itemsToDisplay.length > 0) {
-            newCartVendorGroups.push({ vendorInfo, items: itemsToDisplay, vendorSubtotal: currentVendorSubtotal });
-            newOverallSubtotal += currentVendorSubtotal;
+          setCartVendorGroups(groups);
+          setOverallSubtotal(total);
+          setIsLoading(false);
+          return;
         }
-      });
-      
-      setCartVendorGroups(newCartVendorGroups);
-      const parsedSubtotal = parseFloat(subtotalFromStep3); // Use subtotal from Step 3 directly
-      setOverallSubtotal(isNaN(parsedSubtotal) ? newOverallSubtotal : parsedSubtotal); // Fallback to re-calculated if parsing fails
-      setIsLoading(false);
 
-    } catch (error) {
-      console.error("Error processing cart data:", error);
-      toast({ title: "Error", description: "Could not load cart items. Check console.", variant: "destructive" });
-      setIsLoading(false);
-    }
+        // Fallback to localStorage (Food Cart flow)
+        const savedCart = localStorage.getItem('food_cart');
+        const savedShop = localStorage.getItem('food_cart_shop');
+
+        if (savedCart && savedShop) {
+          const parsedCart = JSON.parse(savedCart); // Array of [id, item]
+          const shop = JSON.parse(savedShop);
+          
+          const items: CartVendorItem[] = parsedCart.map(([, cartItem]: [string, any]) => ({
+            itemId: cartItem.item.id,
+            quantity: cartItem.quantity,
+            name: cartItem.item.name,
+            price: cartItem.item.price,
+            imageUrl: cartItem.item.image_url,
+            details: cartItem.item.description
+          }));
+
+          const subtotal = items.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+
+          setCartVendorGroups([{
+            vendorInfo: shop,
+            items,
+            vendorSubtotal: subtotal
+          }]);
+          setOverallSubtotal(subtotal);
+        }
+      } catch (error) {
+        console.error("Error loading cart:", error);
+        toast({ title: "Error", description: "Failed to load cart items", variant: "destructive" });
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    loadCart();
   }, [searchParams, toast]);
 
-  const handleProceedToCheckout = () => {
-    if (cartVendorGroups.length === 0) {
-        toast({ title: "Empty Cart", description: "Your cart is empty.", variant: "destructive" });
-        return;
-    }
-    // Pass all necessary info to Step 5 (Payment)
-    const params = new URLSearchParams({
-      start: startLocation || "",
-      destination: destination || "",
-      selectedVendorIds: rawSelectedVendorIdsString, 
-      finalItemsForCart: rawFinalItemsForCartString, 
-      cartSubtotal: overallSubtotal.toFixed(2),
-      masterItemsListString: rawMasterItemsListString, 
-    });
-    router.push(`/plan-trip/step-5?${params.toString()}`);
-  };
-
-  const handleRemoveItem = (vendorId: string, itemId: string) => {
-    // This is a simplified removal. A real app would need to update underlying data more robustly.
-    let itemRemovedPrice = 0;
-    let itemRemovedQuantity = 0;
-
-    const updatedCartVendorGroups = cartVendorGroups.map(group => {
-      if (group.vendorInfo.id === vendorId) {
-        const itemToRemove = group.items.find(item => item.itemId === itemId);
-        if (itemToRemove) {
-          itemRemovedPrice = itemToRemove.price || 0;
-          itemRemovedQuantity = itemToRemove.quantity;
+  const updateQuantity = (vendorId: string, itemId: string, delta: number) => {
+    setCartVendorGroups(prev => {
+      const newGroups = prev.map(group => {
+        if (group.vendorInfo.id === vendorId) {
+          const newItems = group.items.map(item => {
+            if (item.itemId === itemId) {
+              return { ...item, quantity: Math.max(0, item.quantity + delta) };
+            }
+            return item;
+          }).filter(item => item.quantity > 0);
+          
+          const newSubtotal = newItems.reduce((sum, item) => sum + (item.price || 0) * item.quantity, 0);
+          return { ...group, items: newItems, vendorSubtotal: newSubtotal };
         }
-        return {
-          ...group,
-          items: group.items.filter(item => item.itemId !== itemId),
-          vendorSubtotal: group.vendorSubtotal - (itemRemovedPrice * itemRemovedQuantity)
-        };
-      }
-      return group;
-    }).filter(group => group.items.length > 0); // Remove vendor group if it becomes empty
+        return group;
+      }).filter(group => group.items.length > 0);
 
-    setCartVendorGroups(updatedCartVendorGroups);
-    setOverallSubtotal(prevSubtotal => prevSubtotal - (itemRemovedPrice * itemRemovedQuantity));
-
-    // Update rawFinalItemsForCartString (this is complex and error-prone, ideally managed by a state store)
-    try {
-      const parsedFinalItems: Record<string, Array<{itemId: string, quantity: number}>> = JSON.parse(rawFinalItemsForCartString);
-      if (parsedFinalItems[vendorId]) {
-        parsedFinalItems[vendorId] = parsedFinalItems[vendorId].filter(item => item.itemId !== itemId);
-        if (parsedFinalItems[vendorId].length === 0) {
-          delete parsedFinalItems[vendorId];
-        }
-        setRawFinalItemsForCartString(JSON.stringify(parsedFinalItems));
-
-        // Update rawSelectedVendorIdsString if a vendor becomes empty
-        if (Object.keys(parsedFinalItems).length === 0) {
-            setRawSelectedVendorIdsString("");
+      const newTotal = newGroups.reduce((sum, group) => sum + group.vendorSubtotal, 0);
+      setOverallSubtotal(newTotal);
+      
+      // Update localStorage if using Food Cart flow
+      if (!searchParams.get("finalItemsForCart")) {
+        if (newGroups.length === 0) {
+          localStorage.removeItem('food_cart');
+          localStorage.removeItem('food_cart_shop');
         } else {
-            setRawSelectedVendorIdsString(Object.keys(parsedFinalItems).join(','));
+          // Reconstruct map for localStorage
+          const mapEntries = newGroups[0].items.map(item => [
+            item.itemId,
+            {
+              item: { 
+                id: item.itemId, 
+                name: item.name, 
+                price: item.price, 
+                image_url: item.imageUrl, 
+                description: item.details 
+              },
+              quantity: item.quantity,
+              totalPrice: (item.price || 0) * item.quantity
+            }
+          ]);
+          localStorage.setItem('food_cart', JSON.stringify(mapEntries));
         }
       }
-    } catch (e) { console.error("Error updating raw cart string on removal:", e); }
 
-
-    toast({
-      title: "Item Removed",
-      description: `Item removed from ${vendorId}. Subtotal updated.`,
+      return newGroups;
     });
   };
 
+  const handlePlaceOrder = async () => {
+    setIsPlacingOrder(true);
+    try {
+      const orderId = `ORD-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`;
+      
+      // Fetch vendor locations from Supabase
+      const { getSupabaseClient } = await import('@/lib/supabase/client');
+      const supabase = getSupabaseClient();
+      
+      const vendorIds = cartVendorGroups.map(g => g.vendorInfo.id);
+      const { data: vendorsData, error: vendorsError } = await supabase
+        .from('vendors')
+        .select('id, location')
+        .in('id', vendorIds);
+
+      if (vendorsError) {
+        console.error('Error fetching vendor locations:', vendorsError);
+      }
+
+      // Create a map of vendor locations
+      const vendorLocationsMap = new Map<string, { latitude: number; longitude: number }>();
+      if (vendorsData) {
+        vendorsData.forEach((vendor: any) => {
+          if (vendor.location) {
+            // Handle both GeoJSON and plain object formats
+            if (vendor.location.type === 'Point' && vendor.location.coordinates) {
+              // GeoJSON format: [longitude, latitude]
+              vendorLocationsMap.set(vendor.id, {
+                longitude: vendor.location.coordinates[0],
+                latitude: vendor.location.coordinates[1]
+              });
+            } else if (vendor.location.latitude && vendor.location.longitude) {
+              // Plain object format
+              vendorLocationsMap.set(vendor.id, {
+                latitude: vendor.location.latitude,
+                longitude: vendor.location.longitude
+              });
+            }
+          }
+        });
+      }
+
+      const vendorPortions: VendorOrderPortion[] = cartVendorGroups.map(group => {
+        const location = vendorLocationsMap.get(group.vendorInfo.id);
+        return {
+          vendorId: group.vendorInfo.id,
+          vendorName: group.vendorInfo.name,
+          vendorAddress: group.vendorInfo.address,
+          vendorType: group.vendorInfo.type,
+          vendorLocation: location,
+          status: "New",
+          vendorSubtotal: group.vendorSubtotal,
+          items: group.items.map(item => ({
+            itemId: item.itemId,
+            name: item.name || "Unknown Item",
+            quantity: item.quantity,
+            pricePerItem: item.price || 0,
+            totalPrice: (item.price || 0) * item.quantity,
+            imageUrl: item.imageUrl,
+            details: item.details
+          }))
+        };
+      });
+
+      const order: PlacedOrder = {
+        orderId,
+        createdAt: new Date().toISOString(),
+        overallStatus: "New",
+        paymentStatus: "Paid", // Assuming successful payment
+        grandTotal: overallSubtotal,
+        platformFee: 0,
+        paymentGatewayFee: 0,
+        vendorPortions,
+        vendorIds: cartVendorGroups.map(g => g.vendorInfo.id),
+        tripStartLocation: startLocation || undefined,
+        tripDestination: destination || undefined,
+        customerInfo: {
+          name: "Guest User", // Replace with actual user info
+          phoneNumber: "+919876543210"
+        }
+      };
+
+      // Debug logging to help identify vendor ID mismatch
+      console.log("🔍 Order Creation Debug:");
+      console.log("Vendor IDs being used:", order.vendorIds);
+      console.log("Vendor portions:", vendorPortions.map(v => ({ id: v.vendorId, name: v.vendorName, location: v.vendorLocation })));
+      console.log("⚠️ IMPORTANT: These vendor IDs must match the Firebase Auth UIDs of the vendors!");
+      
+      const result = await consumerOrderService.createOrder(order);
+
+      if (result.success) {
+        // Clear cart
+        localStorage.removeItem('food_cart');
+        localStorage.removeItem('food_cart_shop');
+        
+        toast({
+          title: "Order Placed Successfully!",
+          description: `Order #${orderId} has been sent to the vendor.`,
+        });
+        
+        // Redirect to tracking or success page
+        // For now, redirect to home or order tracking
+        setTimeout(() => {
+            router.push(`/order-tracking/${orderId}`);
+        }, 1000);
+      } else {
+        throw new Error(result.error);
+      }
+    } catch (error: any) {
+      console.error("Order placement failed:", error);
+      toast({
+        title: "Order Failed",
+        description: error.message || "Could not place order. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsPlacingOrder(false);
+      setIsPaymentOpen(false);
+    }
+  };
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background p-6">
-        <Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-        <p className="text-muted-foreground">Loading your cart...</p>
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
     );
   }
-  
-  const handleBackToStep3 = () => {
-    const params = new URLSearchParams();
-    if (startLocation) params.set("start", startLocation);
-    if (destination) params.set("destination", destination);
-    params.set("maxDetourKm", rawMaxDetourKm);
-    
-    // Pass back original selections for Step 2 if user wants to go that far back
-    params.set("selectedGlobalItemsData", rawSelectedGlobalItemsData);
-    params.set("selectedShopSpecificItemsData", rawSelectedShopSpecificItemsData);
-    params.set("selectedGlobalItemsQuantities", rawSelectedGlobalItemsQuantities);
-    params.set("selectedShopSpecificItemsQuantities", rawSelectedShopSpecificItemsQuantities);
-    
-    router.push(`/plan-trip/step-3?${params.toString()}`);
-  };
-
 
   return (
     <div className="flex min-h-screen flex-col bg-background">
-        <header className="bg-primary text-primary-foreground p-4 shadow-md sticky top-0 z-20">
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center">
-                    <Button variant="ghost" size="icon" className="mr-2 hover:bg-primary/80" 
-                            onClick={handleBackToStep3}>
-                        <ChevronLeft className="h-6 w-6" />
-                    </Button>
-                    <h1 className="text-xl font-semibold">Step 4 of 5: My Cart</h1>
-                </div>
-                <Button variant="ghost" size="icon" className="hover:bg-primary/80" onClick={() => router.push('/home')}>
-                    <Home className="h-6 w-6" />
-                </Button>
-            </div>
-             <div className="flex justify-around">
-                {[1,2,3,4,5].map((step) => (
-                <Button key={step} variant="default" size="sm" className={cn("rounded-full w-10 h-10 p-0 flex items-center justify-center",
-                    step === 4 ? "bg-foreground text-background hover:bg-foreground/90" : 
-                    step <= 3 ? "bg-green-500 text-white hover:bg-green-600" : 
-                    "bg-primary text-primary-foreground border border-primary-foreground hover:bg-primary/80")}>
-                {step <= 3 ? <Check className="h-5 w-5" /> : step}
-                </Button>))}
-            </div>
-        </header>
+      {/* Header */}
+      <div className="bg-background p-4 sticky top-0 z-10">
+        <h1 className="text-2xl font-bold">My cart</h1>
+      </div>
 
-      <main className="flex-1 overflow-y-auto p-4 space-y-6 pb-32">
-        {startLocation && destination && (
-          <Card className="bg-muted/30">
-            <CardContent className="p-3 text-sm">
-              <div className="flex items-center">
-                <MapPin className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
-                <span className="font-medium text-foreground">From:</span>&nbsp;
-                <span className="text-muted-foreground truncate">{startLocation}</span>
-              </div>
-              <div className="flex items-center">
-                <MapPin className="h-4 w-4 mr-2 text-primary flex-shrink-0" />
-                <span className="font-medium text-foreground">To:</span>&nbsp;
-                <span className="text-muted-foreground truncate">{destination}</span>
-              </div>
-            </CardContent>
-          </Card>
+      <div className="flex-1 p-4 pb-32 space-y-6">
+        {/* Trip Card */}
+        {destination && (
+          <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-blue-200/50"></div>
+            <p className="text-xs text-muted-foreground mb-1">Trip to</p>
+            <h2 className="text-lg font-semibold text-foreground">{destination}</h2>
+            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-blue-100 rounded-full opacity-50 blur-xl"></div>
+          </div>
         )}
 
-        {cartVendorGroups.length === 0 && !isLoading && (
-            <div className="text-center py-10">
-                <ShoppingCart className="mx-auto h-16 w-16 text-muted-foreground mb-4" />
-                <p className="text-xl font-semibold text-foreground">Your cart is empty</p>
-                <Button asChild className="mt-6"><Link href="/home">Start Shopping</Link></Button>
-            </div>
-        )}
-
-        {cartVendorGroups.map(({ vendorInfo, items, vendorSubtotal }) => (
-          <Card key={vendorInfo.id}>
-            <CardHeader><CardTitle className="text-lg">{vendorInfo.name}</CardTitle><p className="text-xs text-muted-foreground">{vendorInfo.type}</p></CardHeader>
-            <CardContent>
-              <ul className="space-y-3">
-                {items.map(item => (
-                  <li key={item.itemId} className="flex items-start space-x-3 relative">
-                    <Image src={item.imageUrl || "https://placehold.co/80x80.png"} alt={item.name || "Item"} width={64} height={64} className="rounded-md border bg-muted object-cover" data-ai-hint={item.dataAiHint || "product image"} />
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">{item.name || "Item Name Missing"}</p>
-                      {item.details && <p className="text-xs text-muted-foreground">{item.details}</p>}
-                      <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-                      <p className="text-sm font-semibold text-foreground mt-1">₹{(item.price || 0).toFixed(2)}</p>
+        {cartVendorGroups.length === 0 ? (
+          <div className="text-center py-12">
+            <ShoppingCart className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
+            <p>Your cart is empty</p>
+            <Button variant="link" onClick={() => router.push('/home')}>Go Shopping</Button>
+          </div>
+        ) : (
+          <div className="space-y-8">
+            {cartVendorGroups.map(group => (
+              <div key={group.vendorInfo.id}>
+                <h3 className="text-xs text-muted-foreground mb-4 pl-1">{group.vendorInfo.name}</h3>
+                <div className="space-y-6">
+                  {group.items.map(item => (
+                    <div key={item.itemId} className="flex gap-4">
+                      <div className="w-16 h-16 bg-muted rounded-lg flex-shrink-0 overflow-hidden border border-gray-100">
+                        <Image 
+                          src={item.imageUrl || "https://placehold.co/64x64.png"} 
+                          alt={item.name || "Item"} 
+                          width={64} 
+                          height={64} 
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="flex-1 flex items-center justify-between">
+                        <div>
+                          <h4 className="font-semibold text-sm">{item.name}</h4>
+                          <p className="text-xs text-muted-foreground mt-1">{item.details || "200 gm"}</p>
+                        </div>
+                        <div className="flex flex-col items-end gap-1">
+                           {/* Black Quantity Buttons */}
+                          <div className="flex items-center bg-black text-white rounded-md h-8 px-1">
+                            <button 
+                              className="w-7 h-full flex items-center justify-center hover:bg-white/10 rounded-l-md transition-colors"
+                              onClick={() => updateQuantity(group.vendorInfo.id, item.itemId, -1)}
+                            >
+                              <Minus className="h-3 w-3" />
+                            </button>
+                            <span className="text-sm font-medium w-6 text-center">{item.quantity}</span>
+                            <button 
+                              className="w-7 h-full flex items-center justify-center hover:bg-white/10 rounded-r-md transition-colors"
+                              onClick={() => updateQuantity(group.vendorInfo.id, item.itemId, 1)}
+                            >
+                              <Plus className="h-3 w-3" />
+                            </button>
+                          </div>
+                          <div className="text-right">
+                             {item.price && (
+                              <>
+                                <span className="text-[10px] text-muted-foreground line-through block">₹{Math.round(item.price * 1.1)}</span>
+                                <span className="font-bold text-sm">₹{item.price * item.quantity}</span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-destructive h-7 w-7 absolute top-0 right-0" onClick={() => handleRemoveItem(vendorInfo.id, item.itemId)} aria-label="Remove item"><XCircle className="h-5 w-5" /></Button>
-                  </li>))}
-              </ul>
-              <Separator className="my-3" />
-              <div className="flex justify-end">
-                <p className="text-sm font-medium">Subtotal for {vendorInfo.name.split(',')[0]}: <span className="font-semibold text-foreground">₹{vendorSubtotal.toFixed(2)}</span></p>
+                  ))}
+                </div>
+                <Separator className="mt-6" />
               </div>
-            </CardContent>
-          </Card>
-        ))}
-        
-        {cartVendorGroups.length > 0 && (
-            <Card className="mt-6 shadow-md">
-                <CardHeader><CardTitle className="text-lg">Order Summary</CardTitle></CardHeader>
-                <CardContent><div className="flex justify-between text-md font-semibold"><span>Total Item Price</span><span>₹{overallSubtotal.toFixed(2)}</span></div><p className="text-xs text-muted-foreground mt-1">Taxes and fees calculated at checkout.</p></CardContent>
-            </Card>
+            ))}
+          </div>
         )}
-      </main>
 
+        {/* Pickup Location */}
+        <div className="mt-4">
+          <h3 className="text-xs text-muted-foreground mb-2">Pickup location</h3>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-foreground" />
+              <span className="font-medium text-sm">{startLocation || "Kalyani Nagar, Pune"}</span>
+            </div>
+            <Button variant="link" className="text-orange-500 h-auto p-0 text-sm font-normal">Change</Button>
+          </div>
+          <p className="text-[10px] text-muted-foreground mt-1 pl-6">1 KM from your location</p>
+        </div>
+      </div>
+
+      {/* Bottom Bar */}
       {cartVendorGroups.length > 0 && (
-        <div className="fixed bottom-16 left-0 right-0 p-4 border-t bg-background shadow-md z-20">
-            <div className="flex justify-between items-center mb-3"><span className="text-lg font-semibold text-foreground">Subtotal:</span><span className="text-xl font-bold text-primary">₹{overallSubtotal.toFixed(2)}</span></div>
-            <Button className="w-full bg-accent hover:bg-accent/90 text-accent-foreground py-3 text-base" onClick={handleProceedToCheckout}>
-              Confirm &amp; Pay ({cartVendorGroups.reduce((acc, cvg) => acc + cvg.items.reduce((itemSum, item) => itemSum + item.quantity, 0) , 0)} items)
+        <div className="fixed bottom-0 left-0 right-0 bg-black text-white p-4 pb-8 rounded-t-3xl z-20">
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="text-2xl font-bold">₹{overallSubtotal}</div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-400">TOTAL</span>
+                <div className="text-[10px] bg-[#2A4D46] text-[#4ADE80] px-1.5 py-0.5 rounded">SAVING ₹44</div>
+              </div>
+            </div>
+            <Button 
+              className="bg-transparent hover:bg-white/10 text-white border-none text-lg font-medium h-auto p-0"
+              onClick={() => setIsPaymentOpen(true)}
+            >
+              Place Order
             </Button>
+          </div>
         </div>
       )}
-      <BottomNav />
+
+      {/* Payment Modal */}
+      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+        <DialogContent className="sm:max-w-md p-6 gap-6 bg-white rounded-t-3xl sm:rounded-xl !max-w-none sm:!max-w-md fixed bottom-0 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 left-0 sm:left-1/2 sm:-translate-x-1/2 w-full mb-0 pb-8">
+            <div className="flex justify-between items-center">
+              <h3 className="text-xl font-bold">Pay ₹{overallSubtotal}</h3>
+              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full bg-gray-100 hover:bg-gray-200" onClick={() => setIsPaymentOpen(false)}>
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+
+            <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod} className="space-y-3">
+              <div className={cn(
+                "flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer",
+                paymentMethod === "gpay" ? "border-black bg-gray-50" : "border-gray-100"
+              )} onClick={() => setPaymentMethod("gpay")}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white border rounded-full flex items-center justify-center shadow-sm">
+                    <span className="font-bold text-blue-500 text-lg">G</span>
+                  </div>
+                  <span className="font-semibold">GPay UPI</span>
+                </div>
+                <div className={cn("w-5 h-5 rounded-full border flex items-center justify-center", paymentMethod === "gpay" ? "bg-black border-black" : "border-gray-300")}>
+                    {paymentMethod === "gpay" && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <RadioGroupItem value="gpay" id="gpay" className="sr-only" />
+              </div>
+
+              <div className={cn(
+                "flex items-center justify-between p-4 rounded-xl border transition-all cursor-pointer",
+                paymentMethod === "phonepe" ? "border-black bg-gray-50" : "border-gray-100"
+              )} onClick={() => setPaymentMethod("phonepe")}>
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-[#5f259f] rounded-full flex items-center justify-center text-white font-bold shadow-sm">
+                    Pe
+                  </div>
+                  <span className="font-semibold">PhonePe UPI</span>
+                </div>
+                <div className={cn("w-5 h-5 rounded-full border flex items-center justify-center", paymentMethod === "phonepe" ? "bg-black border-black" : "border-gray-300")}>
+                    {paymentMethod === "phonepe" && <Check className="h-3 w-3 text-white" />}
+                </div>
+                <RadioGroupItem value="phonepe" id="phonepe" className="sr-only" />
+              </div>
+            </RadioGroup>
+
+            <Button 
+              className="w-full bg-[#F06A5D] hover:bg-[#d65a4e] text-white py-6 text-lg rounded-xl shadow-lg mt-4"
+              onClick={handlePlaceOrder}
+              disabled={isPlacingOrder}
+            >
+              {isPlacingOrder ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Processing...
+                </>
+              ) : (
+                "Proceed to Pay"
+              )}
+            </Button>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -386,10 +523,7 @@ export default function CartPage() {
   return (
     <Suspense fallback={
       <div className="flex min-h-screen items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
-          <p>Loading cart...</p>
-        </div>
+        <Loader2 className="h-8 w-8 animate-spin" />
       </div>
     }>
       <CartPageContent />

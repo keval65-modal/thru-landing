@@ -57,6 +57,51 @@ CREATE POLICY "Service role has full access on orders"
   USING (auth.role() = 'service_role');
 
 -- =========================================
+-- 1B. PLACED ORDERS TABLE (CONSUMER APP)
+-- =========================================
+
+CREATE TABLE IF NOT EXISTS placed_orders (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT timezone('utc', now()),
+  updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT timezone('utc', now()),
+  customer_info JSONB,
+  trip_start_location TEXT,
+  trip_destination TEXT,
+  overall_status TEXT NOT NULL DEFAULT 'Pending Confirmation',
+  payment_status TEXT NOT NULL DEFAULT 'Pending',
+  grand_total DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  platform_fee DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  payment_gateway_fee DECIMAL(12, 2) NOT NULL DEFAULT 0,
+  vendor_portions JSONB NOT NULL DEFAULT '[]'::jsonb,
+  vendor_ids TEXT[] NOT NULL DEFAULT '{}'
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_placed_orders_order_id ON placed_orders(order_id);
+CREATE INDEX IF NOT EXISTS idx_placed_orders_created_at ON placed_orders(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_placed_orders_overall_status ON placed_orders(overall_status);
+CREATE INDEX IF NOT EXISTS idx_placed_orders_vendor_ids ON placed_orders USING GIN(vendor_ids);
+
+ALTER TABLE placed_orders ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Customers can read placed orders" ON placed_orders;
+DROP POLICY IF EXISTS "Customers can update placed orders" ON placed_orders;
+DROP POLICY IF EXISTS "Service role manages placed orders" ON placed_orders;
+
+CREATE POLICY "Customers can read placed orders"
+  ON placed_orders FOR SELECT
+  USING (auth.role() IN ('anon', 'authenticated', 'service_role'));
+
+CREATE POLICY "Customers can update placed orders"
+  ON placed_orders FOR UPDATE
+  USING (auth.role() IN ('anon', 'authenticated'))
+  WITH CHECK (auth.role() IN ('anon', 'authenticated'));
+
+CREATE POLICY "Service role manages placed orders"
+  ON placed_orders FOR ALL
+  USING (auth.role() = 'service_role')
+  WITH CHECK (auth.role() = 'service_role');
+-- =========================================
 -- 2. VENDORS TABLE
 -- =========================================
 
@@ -209,12 +254,18 @@ $$ LANGUAGE plpgsql;
 
 -- Drop existing triggers if they exist
 DROP TRIGGER IF EXISTS update_orders_updated_at ON orders;
+DROP TRIGGER IF EXISTS update_placed_orders_updated_at ON placed_orders;
 DROP TRIGGER IF EXISTS update_vendors_updated_at ON vendors;
 DROP TRIGGER IF EXISTS update_user_profiles_updated_at ON user_profiles;
 
 -- Apply triggers to all tables
 CREATE TRIGGER update_orders_updated_at
   BEFORE UPDATE ON orders
+  FOR EACH ROW
+  EXECUTE FUNCTION update_updated_at_column();
+
+CREATE TRIGGER update_placed_orders_updated_at
+  BEFORE UPDATE ON placed_orders
   FOR EACH ROW
   EXECUTE FUNCTION update_updated_at_column();
 
@@ -326,10 +377,24 @@ $$;
 -- Enable Realtime for all tables
 -- Note: You may need to enable this in Supabase Dashboard > Database > Replication
 
-ALTER PUBLICATION supabase_realtime ADD TABLE orders;
-ALTER PUBLICATION supabase_realtime ADD TABLE vendors;
-ALTER PUBLICATION supabase_realtime ADD TABLE vendor_responses;
-ALTER PUBLICATION supabase_realtime ADD TABLE user_profiles;
+DO $$
+DECLARE
+  tbl text;
+  tables text[] := ARRAY['orders', 'placed_orders', 'vendors', 'vendor_responses', 'user_profiles'];
+BEGIN
+  FOREACH tbl IN ARRAY tables LOOP
+    IF NOT EXISTS (
+      SELECT 1
+      FROM pg_publication_rel pr
+      JOIN pg_class c ON c.oid = pr.prrelid
+      JOIN pg_publication p ON p.oid = pr.prpubid
+      WHERE p.pubname = 'supabase_realtime'
+        AND c.relname = tbl
+    ) THEN
+      EXECUTE format('ALTER PUBLICATION supabase_realtime ADD TABLE %I', tbl);
+    END IF;
+  END LOOP;
+END $$;
 
 -- =========================================
 -- SCHEMA SETUP COMPLETE
@@ -344,12 +409,26 @@ GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO anon, authenticated, service_role
 -- Success message
 DO $$
 BEGIN
-  RAISE NOTICE '✅ Supabase schema setup complete!';
+  RAISE NOTICE 'ÃƒÆ’Ã‚Â¢Ãƒâ€¦Ã¢â‚¬Å“ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â¦ Supabase schema setup complete!';
   RAISE NOTICE 'Next steps:';
   RAISE NOTICE '1. Review Row Level Security policies';
   RAISE NOTICE '2. Run the data migration script';
   RAISE NOTICE '3. Update your application code';
 END $$;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

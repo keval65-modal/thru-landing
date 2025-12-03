@@ -213,20 +213,36 @@ export class RouteBasedShopDiscovery {
     transportMode: 'driving' | 'walking' | 'transit'
   ): Promise<RouteCalculationResult> {
     if (!this.directionsService) {
-      console.warn('⚠️ Google Maps Directions Service not available - using simple distance-based fallback')
+      console.warn('⚠️ Google Maps Directions Service not available - using perpendicular distance fallback')
       
-      // FALLBACK: Show shops within maxDetourKm of route midpoint
-      const midpoint = {
-        lat: (startPoint.latitude + endPoint.latitude) / 2,
-        lng: (startPoint.longitude + endPoint.longitude) / 2
-      }
-      
+      // CORRECT FALLBACK: Calculate perpendicular distance from shop to route LINE
       const nearbyShops: RouteBasedShop[] = shops
         .map(shop => {
-          const distanceToMidpoint = this.calculateDistance(
-            midpoint.lat, 
-            midpoint.lng, 
-            shop.coordinates.lat, 
+          // Calculate perpendicular distance from shop to the line segment between start and end
+          const distanceFromLine = this.calculatePerpendicularDistance(
+            shop.coordinates.lat,
+            shop.coordinates.lng,
+            startPoint.latitude,
+            startPoint.longitude,
+            endPoint.latitude,
+            endPoint.longitude
+          )
+          
+          // Calculate position along route (0 = start, 1 = end)
+          const routePosition = this.calculateRoutePosition(
+            shop.coordinates.lat,
+            shop.coordinates.lng,
+            startPoint.latitude,
+            startPoint.longitude,
+            endPoint.latitude,
+            endPoint.longitude
+          )
+          
+          // Distance from start
+          const distanceFromStart = this.calculateDistance(
+            startPoint.latitude,
+            startPoint.longitude,
+            shop.coordinates.lat,
             shop.coordinates.lng
           )
           
@@ -237,17 +253,25 @@ export class RouteBasedShopDiscovery {
             coordinates: shop.coordinates,
             address: shop.address,
             categories: shop.categories,
-            distanceFromRoute: distanceToMidpoint,
-            detourDistance: distanceToMidpoint,
-            routePosition: 0.5, // Assume midpoint
-            estimatedTime: Math.round(distanceToMidpoint * 3), // ~3 min per km
-            isOnRoute: distanceToMidpoint <= 1 // Within 1km is "on route"
+            distanceFromRoute: distanceFromLine,
+            detourDistance: distanceFromLine,
+            routePosition: routePosition,
+            estimatedTime: Math.round(distanceFromStart * 3), // ~3 min per km
+            isOnRoute: distanceFromLine <= 1 // Within 1km is "on route"
           }
         })
-        .filter(shop => shop.distanceFromRoute <= maxDetourKm)
-        .sort((a, b) => a.distanceFromRoute - b.distanceFromRoute)
+        .filter(shop => {
+          // Filter: perpendicular distance within maxDetourKm AND reasonably along the route (not way past endpoints)
+          const withinDetour = shop.distanceFromRoute <= maxDetourKm
+          const alongRoute = shop.routePosition >= -0.2 && shop.routePosition <= 1.2 // Allow 20% margin on either side
+          return withinDetour && alongRoute
+        })
+        .sort((a, b) => a.routePosition - b.routePosition) // Sort by position along route
       
-      console.log(`✅ Fallback mode: Found ${nearbyShops.length} shops within ${maxDetourKm}km`)
+      console.log(`✅ Fallback mode: Found ${nearbyShops.length} shops within ${maxDetourKm}km of route`)
+      nearbyShops.forEach(shop => {
+        console.log(`  - ${shop.name}: ${shop.distanceFromRoute.toFixed(2)}km from route, position ${(shop.routePosition * 100).toFixed(0)}%`)
+      })
       
       return {
         shops: nearbyShops,
@@ -255,7 +279,10 @@ export class RouteBasedShopDiscovery {
         totalDistance: this.calculateDistance(startPoint.latitude, startPoint.longitude, endPoint.latitude, endPoint.longitude),
         totalDuration: 0,
         detourArea: {
-          center: midpoint,
+          center: {
+            lat: (startPoint.latitude + endPoint.latitude) / 2,
+            lng: (startPoint.longitude + endPoint.longitude) / 2
+          },
           radius: maxDetourKm
         }
       }
@@ -269,17 +296,95 @@ export class RouteBasedShopDiscovery {
       optimizeWaypoints: false
     }
 
-    const routeResult = await new Promise<google.maps.DirectionsResult>((resolve, reject) => {
-      this.directionsService!.route(routeRequest, (result, status) => {
-        if (status === google.maps.DirectionsStatus.OK && result) {
-          resolve(result)
-        } else {
-          console.warn(`⚠️ Google Maps Directions request failed: ${status}`)
-          // Return empty result instead of throwing error
-          reject(new Error(`Directions request failed: ${status}`))
-        }
+    let routeResult: google.maps.DirectionsResult;
+    try {
+      // Add timeout to prevent hanging forever
+      routeResult = await Promise.race([
+        new Promise<google.maps.DirectionsResult>((resolve, reject) => {
+          this.directionsService!.route(routeRequest, (result, status) => {
+            if (status === google.maps.DirectionsStatus.OK && result) {
+              resolve(result)
+            } else {
+              console.warn(`⚠️ Google Maps Directions request failed: ${status}`)
+              reject(new Error(`Directions request failed: ${status}`))
+            }
+          })
+        }),
+        new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Google Maps request timeout after 5 seconds')), 5000)
+        )
+      ])
+    } catch (error) {
+      console.error('❌ Google Maps error, falling back to perpendicular distance calculation:', error)
+      
+      // FALLBACK: Calculate perpendicular distance from shop to route LINE
+      const nearbyShops: RouteBasedShop[] = shops
+        .map(shop => {
+          const distanceFromLine = this.calculatePerpendicularDistance(
+            shop.coordinates.lat,
+            shop.coordinates.lng,
+            startPoint.latitude,
+            startPoint.longitude,
+            endPoint.latitude,
+            endPoint.longitude
+          )
+          
+          const routePosition = this.calculateRoutePosition(
+            shop.coordinates.lat,
+            shop.coordinates.lng,
+            startPoint.latitude,
+            startPoint.longitude,
+            endPoint.latitude,
+            endPoint.longitude
+          )
+          
+          const distanceFromStart = this.calculateDistance(
+            startPoint.latitude,
+            startPoint.longitude,
+            shop.coordinates.lat,
+            shop.coordinates.lng
+          )
+          
+          return {
+            id: shop.id,
+            name: shop.name,
+            type: shop.type,
+            coordinates: shop.coordinates,
+            address: shop.address,
+            categories: shop.categories,
+            distanceFromRoute: distanceFromLine,
+            detourDistance: distanceFromLine,
+            routePosition: routePosition,
+            estimatedTime: Math.round(distanceFromStart * 3),
+            isOnRoute: distanceFromLine <= 1
+          }
+        })
+        .filter(shop => {
+          const withinDetour = shop.distanceFromRoute <= maxDetourKm
+          const alongRoute = shop.routePosition >= -0.2 && shop.routePosition <= 1.2
+          return withinDetour && alongRoute
+        })
+        .sort((a, b) => a.routePosition - b.routePosition)
+      
+      console.log(`✅ Fallback mode (after error): Found ${nearbyShops.length} shops within ${maxDetourKm}km of route`)
+      nearbyShops.forEach(shop => {
+        console.log(`  - ${shop.name}: ${shop.distanceFromRoute.toFixed(2)}km from route, position ${(shop.routePosition * 100).toFixed(0)}%`)
       })
-    })
+      
+      return {
+        shops: nearbyShops,
+        routePolyline: '',
+        totalDistance: this.calculateDistance(startPoint.latitude, startPoint.longitude, endPoint.latitude, endPoint.longitude),
+        totalDuration: 0,
+        detourArea: {
+          center: {
+            lat: (startPoint.latitude + endPoint.latitude) / 2,
+            lng: (startPoint.longitude + endPoint.longitude) / 2
+          },
+          radius: maxDetourKm
+        }
+      }
+    }
 
     // Extract route polyline and basic info
     const routePolyline = routeResult.routes[0].overview_polyline
@@ -428,6 +533,93 @@ export class RouteBasedShopDiscovery {
 
   private deg2rad(deg: number): number {
     return deg * (Math.PI/180)
+  }
+
+  // Calculate perpendicular distance from a point to a line segment
+  private calculatePerpendicularDistance(
+    pointLat: number,
+    pointLng: number,
+    line1Lat: number,
+    line1Lng: number,
+    line2Lat: number,
+    line2Lng: number
+  ): number {
+    // Convert to meters using simple projection (good enough for short distances)
+    const x = pointLng
+    const y = pointLat
+    const x1 = line1Lng
+    const y1 = line1Lat
+    const x2 = line2Lng
+    const y2 = line2Lat
+    
+    // Calculate perpendicular distance from point to line segment
+    const A = x - x1
+    const B = y - y1
+    const C = x2 - x1
+    const D = y2 - y1
+    
+    const dot = A * C + B * D
+    const lenSq = C * C + D * D
+    
+    let param = -1
+    if (lenSq !== 0) {
+      param = dot / lenSq
+    }
+    
+    let xx, yy
+    
+    if (param < 0) {
+      // Closest point is line1
+      xx = x1
+      yy = y1
+    } else if (param > 1) {
+      // Closest point is line2
+      xx = x2
+      yy = y2
+    } else {
+      // Closest point is on the line segment
+      xx = x1 + param * C
+      yy = y1 + param * D
+    }
+    
+    // Calculate distance from point to closest point on line
+    const distanceInDegrees = Math.sqrt((x - xx) * (x - xx) + (y - yy) * (y - yy))
+    
+    // Convert to km (approximate: 1 degree ≈ 111km at equator)
+    // For more accuracy, we use Haversine
+    return this.calculateDistance(pointLat, pointLng, yy, xx) / 1000
+  }
+
+  // Calculate position along route (0 = start, 1 = end)
+  private calculateRoutePosition(
+    pointLat: number,
+    pointLng: number,
+    line1Lat: number,
+    line1Lng: number,
+    line2Lat: number,
+    line2Lng: number
+  ): number {
+    const x = pointLng
+    const y = pointLat
+    const x1 = line1Lng
+    const y1 = line1Lat
+    const x2 = line2Lng
+    const y2 = line2Lat
+    
+    // Project point onto line and return parameter t (0 = start, 1 = end)
+    const A = x - x1
+    const B = y - y1
+    const C = x2 - x1
+    const D = y2 - y1
+    
+    const dot = A * C + B * D
+    const lenSq = C * C + D * D
+    
+    if (lenSq === 0) {
+      return 0 // Start and end are the same point
+    }
+    
+    return dot / lenSq
   }
 
   // Calculate detour area

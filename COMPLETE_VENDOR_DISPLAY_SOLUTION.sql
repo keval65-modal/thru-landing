@@ -442,3 +442,16 @@ FROM get_vendors_near_point(18.5204, 73.8567, 10);
 -- ✅ Can be queried by location
 -- ✅ Will appear in user app route searches
 
+
+
+
+
+
+
+
+
+
+
+
+
+
