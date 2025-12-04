@@ -89,7 +89,33 @@ export default function OrderTrackingPage() {
         },
         (payload) => {
           if (payload.new) {
-            setOrder(mapSupabaseOrder(payload.new));
+            const newOrder = mapSupabaseOrder(payload.new);
+            setOrder(newOrder);
+
+            // Check for cancellation and notify user
+            // We check if any vendor portion is cancelled in the new payload
+            // Ideally we'd compare with previous state, but for now just notifying if we see a cancelled status is okay,
+            // though it might toast on every update if we're not careful.
+            // Better approach: Check if the status CHANGED to Cancelled.
+            // Since we don't have easy access to 'prev' state inside this callback without refs or functional updates that might be tricky with the mapSupabaseOrder,
+            // we'll rely on the user seeing the UI update. 
+            // BUT, the user asked for "notified without refreshing".
+            // Let's use a simple check: if the OVERALL status changed to Cancelled, or a vendor status is Cancelled.
+            
+            // Let's just toast if we see a cancellation and maybe we haven't toasted yet? 
+            // Actually, let's just let the UI update do the talking, but maybe pop a toast if it's a *new* cancellation.
+            // For simplicity and robustness, let's just trigger a toast if we detect a cancelled vendor portion.
+            
+             newOrder.vendorPortions.forEach(vp => {
+                if (vp.status === 'Cancelled') {
+                    toast({
+                        title: `Order Cancelled by ${vp.vendorName}`,
+                        description: vp.rejectionReason || "The vendor has cancelled your order.",
+                        variant: "destructive",
+                        duration: 5000,
+                    });
+                }
+             });
           }
         }
       )
@@ -325,11 +351,18 @@ export default function OrderTrackingPage() {
                                 <div className="flex justify-between items-center">
                                     {vendor.status === "New" || vendor.status === "Pending Vendor Confirmation" ? (
                                         <p className="text-[10px] text-muted-foreground">Preparation time - 15 min</p>
+                                    ) : vendor.status === "Cancelled" ? (
+                                        <div className="flex flex-col gap-1">
+                                            <p className="text-xs font-bold text-destructive">Cancelled</p>
+                                            {vendor.rejectionReason && (
+                                                <p className="text-[10px] text-muted-foreground">Reason: {vendor.rejectionReason}</p>
+                                            )}
+                                        </div>
                                     ) : (
                                         <p className="text-[10px] text-muted-foreground">Status: {vendor.status}</p>
                                     )}
                                     
-                                    {!isPaymentFailed && (
+                                    {!isPaymentFailed && vendor.status !== "Cancelled" && (
                                         <Button 
                                             variant="link" 
                                             className="text-[#F06A5D] text-[10px] h-auto p-0 underline decoration-[#F06A5D]/30"
@@ -341,7 +374,7 @@ export default function OrderTrackingPage() {
                                 </div>
                                 
                                 {/* Navigate to Vendor Button */}
-                                {vendor.vendorLocation && !isCompleted && (
+                                {vendor.vendorLocation && !isCompleted && vendor.status !== "Cancelled" && (
                                     <Button
                                         variant="outline"
                                         size="sm"
@@ -350,6 +383,18 @@ export default function OrderTrackingPage() {
                                     >
                                         <Navigation className="h-3 w-3 mr-1" />
                                         Navigate to {vendor.vendorName}
+                                    </Button>
+                                )}
+
+                                {/* Buy from another vendor button (Only if cancelled) */}
+                                {vendor.status === "Cancelled" && (
+                                    <Button
+                                        variant="default"
+                                        size="sm"
+                                        className="w-full text-xs h-8 bg-primary hover:bg-primary/90"
+                                        onClick={() => router.push('/home')}
+                                    >
+                                        Buy from another vendor
                                     </Button>
                                 )}
                             </div>

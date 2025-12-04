@@ -29,6 +29,7 @@ export interface VendorOrderPortion {
   vendorType?: string;
   vendorLocation?: { latitude: number; longitude: number }; // For map display
   status: "New" | "Preparing" | "Ready for Pickup" | "Picked Up" | "Cancelled" | "Pending Vendor Confirmation"; 
+  rejectionReason?: string; // Reason for cancellation/rejection 
   items: OrderItemDetail[];
   vendorSubtotal: number;
 }
