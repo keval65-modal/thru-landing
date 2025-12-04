@@ -29,6 +29,7 @@ import { PlacedOrder, VendorOrderPortion } from "@/lib/orderModels";
 import { getSupabaseClient } from "@/lib/supabase/client";
 import { QRCodeCanvas } from "qrcode.react";
 import { OrderTrackingMap } from "@/components/OrderTrackingMap";
+import BottomNav from "@/components/layout/bottom-nav";
 
 export default function OrderTrackingPage() {
   const router = useRouter();
@@ -38,6 +39,7 @@ export default function OrderTrackingPage() {
 
   const [order, setOrder] = React.useState<PlacedOrder | null>(null);
   const [isLoading, setIsLoading] = React.useState(true);
+  const [userLocation, setUserLocation] = React.useState<{ latitude: number; longitude: number } | null>(null);
   const [activeTab, setActiveTab] = React.useState("orders"); // 'orders' is the main view
   const supabase = React.useMemo(() => getSupabaseClient(), []);
 
@@ -97,7 +99,25 @@ export default function OrderTrackingPage() {
       isMounted = false;
       channel.unsubscribe();
     };
+
   }, [orderId, supabase, toast]);
+
+  // Get user location
+  React.useEffect(() => {
+    if ("geolocation" in navigator) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude,
+          });
+        },
+        (error) => {
+          console.error("Error getting user location:", error);
+        }
+      );
+    }
+  }, []);
 
   if (isLoading) {
     return (
@@ -142,6 +162,37 @@ export default function OrderTrackingPage() {
     
     // Google Maps URL for navigation
     const url = `https://www.google.com/maps/dir/?api=1&destination=${destination}&destination_place_id=${label}`;
+    window.open(url, '_blank');
+  };
+
+  // Function to open full route in Google Maps
+  const openRouteInGoogleMaps = () => {
+    if (!userLocation || vendorLocations.length === 0) return;
+
+    // Start: User Location
+    const origin = `${userLocation.latitude},${userLocation.longitude}`;
+    
+    // Waypoints: All vendors except the last one (if multiple) or just all vendors
+    // Actually, for a route, we want Start -> Vendor 1 -> Vendor 2 ... -> Destination
+    
+    const waypoints = vendorLocations.map(v => `${v.latitude},${v.longitude}`).join('|');
+    
+    // Destination: Trip Destination or Last Vendor
+    // Since we don't have coords for tripDestination easily without geocoding, 
+    // we'll use the last vendor as the main destination if tripDestination isn't a coordinate.
+    // However, the user request says "Start and End location". 
+    // If tripDestination is a string address, we can pass it as destination.
+    
+    let destination = "";
+    if (order?.tripDestination) {
+        destination = encodeURIComponent(order.tripDestination);
+    } else if (vendorLocations.length > 0) {
+        // Fallback to last vendor
+        const lastVendor = vendorLocations[vendorLocations.length - 1];
+        destination = `${lastVendor.latitude},${lastVendor.longitude}`;
+    }
+
+    const url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=driving`;
     window.open(url, '_blank');
   };
 
@@ -191,8 +242,22 @@ export default function OrderTrackingPage() {
               </div>
               <OrderTrackingMap 
                 vendors={vendorLocations}
+                userLocation={userLocation || undefined}
                 className="h-[200px] w-full"
               />
+              {userLocation && (
+                <div className="p-2 bg-white border-t flex justify-center">
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="text-xs flex items-center gap-2 w-full border-blue-200 text-blue-600 hover:bg-blue-50"
+                        onClick={openRouteInGoogleMaps}
+                    >
+                        <Navigation className="h-3 w-3" />
+                        Open Full Route in Maps
+                    </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         )}
@@ -359,25 +424,7 @@ export default function OrderTrackingPage() {
       </div>
 
       {/* Bottom Navigation Bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t p-2 px-6 flex justify-between items-end pb-6 z-20">
-        <div className="flex flex-col items-center gap-1 text-gray-400" onClick={() => router.push('/home')}>
-            <Home className="h-6 w-6" />
-            <span className="text-[10px] font-medium">Home</span>
-        </div>
-        <div className="flex flex-col items-center gap-1 text-[#F06A5D] relative">
-             {/* Active Indicator Gradient */}
-            <div className="absolute -top-8 w-12 h-12 bg-[#F06A5D]/20 blur-xl rounded-full"></div>
-            <div className="bg-gradient-to-b from-[#F06A5D]/10 to-transparent w-16 h-12 absolute -top-2 rounded-t-full"></div>
-            
-            <ShoppingBag className="h-6 w-6 z-10" />
-            <span className="text-[10px] font-bold z-10">Orders</span>
-            <div className="h-1 w-12 bg-black rounded-full mt-1"></div>
-        </div>
-        <div className="flex flex-col items-center gap-1 text-gray-400" onClick={() => router.push('/cart')}>
-            <ShoppingCart className="h-6 w-6" />
-            <span className="text-[10px] font-medium">My Cart</span>
-        </div>
-      </div>
+      <BottomNav />
     </div>
   );
 }

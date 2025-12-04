@@ -27,7 +27,8 @@ export default function BottomNav() {
         {navItems.map((item) => {
           const isActive = pathname === item.href || 
                            (item.href === "/home" && pathname === "/") ||
-                           (item.href === "/profile" && pathname.startsWith("/profile")); // Make profile active during profile pages
+                           (item.href === "/profile" && pathname.startsWith("/profile")) ||
+                           (item.label === "Orders" && pathname.startsWith("/order-tracking")); // Make orders active during tracking
           return (
             <Link key={item.label} href={item.href} legacyBehavior>
               <a
