@@ -79,6 +79,7 @@ const nextConfig: NextConfig = {
   experimental: {
     // Enable modern webpack features
     webpackBuildWorker: true,
+    turbopack: {},
   },
 };
 
