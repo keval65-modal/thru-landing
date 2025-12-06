@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { HomeIcon, ListOrdered, User, ShoppingCart } from 'lucide-react';
+import { HomeIcon, ListOrdered, User, MapIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface NavItem {
@@ -14,6 +14,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/home', label: 'Home', icon: HomeIcon },
+  { href: '/map', label: 'Map', icon: MapIcon },
   { href: '/orders', label: 'Orders', icon: ListOrdered },
   { href: '/profile', label: 'Profile', icon: User },
 ];
@@ -33,7 +34,7 @@ export default function BottomNav() {
             <Link key={item.label} href={item.href} legacyBehavior>
               <a
                 className={cn(
-                  "flex flex-col items-center justify-center space-y-1 rounded-md p-2 text-sm font-medium transition-colors w-1/3",
+                  "flex flex-col items-center justify-center space-y-1 rounded-md p-2 text-sm font-medium transition-colors w-1/4",
                   isActive
                     ? "text-primary"
                     : "text-muted-foreground hover:text-primary/80"

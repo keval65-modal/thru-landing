@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Thru User App</string>
+    <string name="title_activity_main">Thru User App</string>
+    <string name="package_name">com.thru.userapp</string>
+    <string name="custom_url_scheme">com.thru.userapp</string>
+</resources>

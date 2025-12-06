@@ -1,45 +1,12 @@
 import type {NextConfig} from 'next';
 
 const nextConfig: NextConfig = {
-  // Production optimizations
-  compress: true,
-  poweredByHeader: false,
-  reactStrictMode: true,
+  // Enable static export for Capacitor mobile app
+  output: 'export',
   
-  // Image optimization
+  // Disable image optimization for static export
   images: {
-    remotePatterns: [
-      {
-        protocol: 'https',
-        hostname: 'app.kiptech.in',
-        port: '',
-        pathname: '/**',
-      },
-    ],
-  },
-
-
-  // Security headers
-  async headers() {
-    return [
-      {
-        source: '/(.*)',
-        headers: [
-          {
-            key: 'Content-Security-Policy',
-            value: [
-              "default-src 'self'",
-              "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.google.com https://www.gstatic.com https://maps.googleapis.com",
-              "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-              "font-src 'self' https://fonts.gstatic.com",
-              "img-src 'self' data: https:",
-              "connect-src 'self' https:",
-              "frame-src 'self' https://www.google.com",
-            ].join('; '),
-          },
-        ],
-      },
-    ];
+    unoptimized: true,
   },
 
   // Webpack configuration to handle compatibility issues
