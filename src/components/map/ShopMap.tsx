@@ -38,10 +38,10 @@ function createInfoWindowContent(shop: ShopMarkerData): string {
   // Determine redirect URL based on shop category
   let redirectUrl = '';
   if (shop.category === ShopCategory.GROCERY) {
-    redirectUrl = `/grocery?vendor=${shop.id}`;
+    redirectUrl = `/home?selectedVendor=${shop.id}&category=grocery&from=map`;
   } else {
-    // For restaurants, cafes, etc. - go to plan-trip with vendor pre-selected
-    redirectUrl = `/plan-trip?vendor=${shop.id}&category=${shop.category}`;
+    // For restaurants, cafes, etc. - go to home with vendor pre-selected
+    redirectUrl = `/home?selectedVendor=${shop.id}&category=${shop.category}&from=map`;
   }
   
   return `
