@@ -126,7 +126,7 @@ export default function RouteSelector({ vendor, onRouteSet }: RouteSelectorProps
         <div>
           <Label htmlFor="destination" className="flex items-center gap-2 mb-2">
             <MapPin className="h-4 w-4" />
-            Final Destination
+            Destination
           </Label>
           <Input
             id="destination"
