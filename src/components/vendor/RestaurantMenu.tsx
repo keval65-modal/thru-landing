@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
-import { useFoodCart } from '@/hooks/useFoodCart';
+import { useFoodCart, FoodItem } from '@/hooks/useFoodCart';
 import { Vendor } from '@/lib/supabase/vendor-service';
 
 interface RestaurantMenuProps {
@@ -19,22 +19,12 @@ interface RestaurantMenuProps {
   };
 }
 
-interface MenuItem {
-  id: string;
-  name: string;
-  description?: string;
-  price: number;
-  category?: string;
-  image?: string;
-  available: boolean;
-}
-
 export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProps) {
   const router = useRouter();
   const { toast } = useToast();
-  const { addItem, removeItem, getItemQuantity, getTotalItems, getTotalPrice } = useFoodCart();
+  const { items, addToCart, updateQuantity, removeFromCart, getItemCount, calculateTotal } = useFoodCart();
   
-  const [menu, setMenu] = useState<MenuItem[]>([]);
+  const [menu, setMenu] = useState<FoodItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
@@ -56,11 +46,6 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
       setMenu(data.items || []);
     } catch (error) {
       console.error('Error loading menu:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load menu. Please try again.',
-        variant: 'destructive'
-      });
       // Set demo menu for now
       setMenu([
         {
@@ -69,7 +54,7 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
           description: 'Classic pizza with tomato sauce and mozzarella',
           price: 12.99,
           category: 'Pizza',
-          available: true
+          vendor_id: vendor.id
         },
         {
           id: '2',
@@ -77,7 +62,7 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
           description: 'Fresh romaine lettuce with Caesar dressing',
           price: 8.99,
           category: 'Salads',
-          available: true
+          vendor_id: vendor.id
         }
       ]);
     } finally {
@@ -90,14 +75,11 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
     ? menu 
     : menu.filter(item => item.category === selectedCategory);
 
-  function handleAddToCart(item: MenuItem) {
-    addItem({
-      id: item.id,
-      name: item.name,
-      price: item.price,
-      vendorId: vendor.id,
-      vendorName: vendor.name,
-      quantity: 1
+  function handleAddToCart(item: FoodItem) {
+    addToCart(item, {
+      id: vendor.id,
+      name: vendor.name,
+      address: vendor.address
     });
 
     toast({
@@ -106,8 +88,17 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
     });
   }
 
+  function handleRemoveFromCart(itemId: string) {
+    const cartItem = items.get(itemId);
+    if (cartItem && cartItem.quantity > 1) {
+      updateQuantity(itemId, cartItem.quantity - 1);
+    } else {
+      removeFromCart(itemId);
+    }
+  }
+
   function handleCheckout() {
-    if (getTotalItems() === 0) {
+    if (getItemCount() === 0) {
       toast({
         title: 'Cart is empty',
         description: 'Please add items to your cart first',
@@ -146,13 +137,13 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
         <div className="flex gap-2 overflow-x-auto pb-2">
           {categories.map(category => (
             <Button
-              key={category}
-              variant={selectedCategory === category ? 'default' : 'outline'}
+              key={category || 'uncategorized'}
+              variant={selectedCategory === (category || 'all') ? 'default' : 'outline'}
               size="sm"
-              onClick={() => setSelectedCategory(category)}
+              onClick={() => setSelectedCategory(category || 'all')}
               className="whitespace-nowrap"
             >
-              {category === 'all' ? 'All Items' : category}
+              {category === 'all' ? 'All Items' : (category || 'Other')}
             </Button>
           ))}
         </div>
@@ -161,14 +152,15 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
       {/* Menu Items */}
       <div className="space-y-4">
         {filteredMenu.map(item => {
-          const quantity = getItemQuantity(item.id);
+          const cartItem = items.get(item.id);
+          const quantity = cartItem?.quantity || 0;
           
           return (
             <Card key={item.id} className="p-4">
               <div className="flex gap-4">
-                {item.image && (
+                {item.image_url && (
                   <img
-                    src={item.image}
+                    src={item.image_url}
                     alt={item.name}
                     className="w-24 h-24 object-cover rounded-lg"
                   />
@@ -186,42 +178,40 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
                     <p className="text-sm text-gray-600 mb-2">{item.description}</p>
                   )}
 
-                  {!item.available && (
-                    <Badge variant="secondary" className="mb-2">
-                      Unavailable
+                  {item.is_veg !== undefined && (
+                    <Badge variant={item.is_veg ? 'default' : 'secondary'} className="mb-2 text-xs">
+                      {item.is_veg ? '🌱 Veg' : 'Non-Veg'}
                     </Badge>
                   )}
 
-                  {item.available && (
-                    <div className="flex items-center gap-2">
-                      {quantity === 0 ? (
+                  <div className="flex items-center gap-2">
+                    {quantity === 0 ? (
+                      <Button
+                        size="sm"
+                        onClick={() => handleAddToCart(item)}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Add
+                      </Button>
+                    ) : (
+                      <div className="flex items-center gap-2">
                         <Button
-                          size="sm"
+                          size="icon"
+                          variant="outline"
+                          onClick={() => handleRemoveFromCart(item.id)}
+                        >
+                          <Minus className="h-4 w-4" />
+                        </Button>
+                        <span className="font-medium w-8 text-center">{quantity}</span>
+                        <Button
+                          size="icon"
                           onClick={() => handleAddToCart(item)}
                         >
-                          <Plus className="h-4 w-4 mr-1" />
-                          Add
+                          <Plus className="h-4 w-4" />
                         </Button>
-                      ) : (
-                        <div className="flex items-center gap-2">
-                          <Button
-                            size="icon"
-                            variant="outline"
-                            onClick={() => removeItem(item.id)}
-                          >
-                            <Minus className="h-4 w-4" />
-                          </Button>
-                          <span className="font-medium w-8 text-center">{quantity}</span>
-                          <Button
-                            size="icon"
-                            onClick={() => handleAddToCart(item)}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </Card>
@@ -230,16 +220,16 @@ export default function RestaurantMenu({ vendor, routeData }: RestaurantMenuProp
       </div>
 
       {/* Cart Summary */}
-      {getTotalItems() > 0 && (
+      {getItemCount() > 0 && (
         <div className="fixed bottom-20 left-0 right-0 p-4 bg-white border-t shadow-lg">
           <div className="max-w-4xl mx-auto flex items-center justify-between">
             <div>
               <div className="flex items-center gap-2">
                 <ShoppingCart className="h-5 w-5" />
-                <span className="font-semibold">{getTotalItems()} items</span>
+                <span className="font-semibold">{getItemCount()} items</span>
               </div>
               <span className="text-lg font-bold text-primary">
-                ${getTotalPrice().toFixed(2)}
+                ${calculateTotal().toFixed(2)}
               </span>
             </div>
             <Button size="lg" onClick={handleCheckout}>

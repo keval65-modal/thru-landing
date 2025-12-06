@@ -44,7 +44,8 @@ export default function VendorOrderPage() {
   async function loadVendor() {
     try {
       setLoading(true);
-      const vendorData = await SupabaseVendorService.getVendorById(vendorId);
+      const vendors = await SupabaseVendorService.getActiveVendors();
+      const vendorData = vendors.find(v => v.id === vendorId);
       
       if (!vendorData) {
         setError('Vendor not found');
