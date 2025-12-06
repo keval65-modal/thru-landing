@@ -39,6 +39,8 @@ export interface ShopMarkerData {
   isOpen: boolean;
   phone?: string;
   email?: string;
+  cuisine?: string;
+  images?: string[];
 }
 
 export interface ShopStatus {

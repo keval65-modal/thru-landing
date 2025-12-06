@@ -35,6 +35,15 @@ function createInfoWindowContent(shop: ShopMarkerData): string {
   const categoryInfo = CATEGORY_INFO[shop.category];
   const todayHours = getTodayHours(shop.operatingHours);
   
+  // Determine redirect URL based on shop category
+  let redirectUrl = '';
+  if (shop.category === ShopCategory.GROCERY) {
+    redirectUrl = `/grocery?vendor=${shop.id}`;
+  } else {
+    // For restaurants, cafes, etc. - go to plan-trip with vendor pre-selected
+    redirectUrl = `/plan-trip?vendor=${shop.id}&category=${shop.category}`;
+  }
+  
   return `
     <div style="padding: 12px; min-width: 280px; max-width: 320px; font-family: system-ui, -apple-system, sans-serif;">
       <!-- Header -->
@@ -52,6 +61,25 @@ function createInfoWindowContent(shop: ShopMarkerData): string {
         </span>
       </div>
 
+      <!-- Product Images (if available) -->
+      ${shop.images && shop.images.length > 0 ? `
+        <div style="margin-bottom: 8px; display: flex; gap: 4px; overflow-x: auto;">
+          ${shop.images.slice(0, 3).map((img: string) => `
+            <img src="${img}" alt="Product" style="width: 80px; height: 80px; object-fit: cover; border-radius: 6px; flex-shrink: 0;" />
+          `).join('')}
+        </div>
+      ` : ''}
+
+      <!-- Cuisine (for restaurants/cafes) -->
+      ${shop.cuisine && (shop.category === ShopCategory.RESTAURANT || shop.category === ShopCategory.CAFE) ? `
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: #4b5563;">
+          <svg style="width: 16px; height: 16px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+          </svg>
+          <span>${shop.cuisine}</span>
+        </div>
+      ` : ''}
+
       <!-- Address -->
       ${shop.address ? `
         <div style="display: flex; align-items: start; gap: 8px; margin-bottom: 8px; font-size: 13px; color: #4b5563;">
@@ -64,38 +92,16 @@ function createInfoWindowContent(shop: ShopMarkerData): string {
       ` : ''}
 
       <!-- Operating hours -->
-      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: #4b5563;">
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px; font-size: 13px; color: #4b5563;">
         <svg style="width: 16px; height: 16px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <span>${todayHours}</span>
       </div>
 
-      <!-- Contact info -->
-      ${shop.phone || shop.email ? `
-        <div style="margin-bottom: 12px;">
-          ${shop.phone ? `
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; margin-bottom: 4px;">
-              <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
-              </svg>
-              <span>${shop.phone}</span>
-            </div>
-          ` : ''}
-          ${shop.email ? `
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280;">
-              <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-              </svg>
-              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${shop.email}</span>
-            </div>
-          ` : ''}
-        </div>
-      ` : ''}
-
       <!-- Action button -->
       <button 
-        onclick="window.location.href='/home?selectedVendor=${shop.id}&from=map'"
+        onclick="window.location.href='${redirectUrl}'"
         style="width: 100%; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: ${shop.isOpen ? 'pointer' : 'not-allowed'}; ${shop.isOpen ? 'background-color: #000; color: white;' : 'background-color: #e5e7eb; color: #9ca3af;'} display: flex; align-items: center; justify-content: center; gap: 8px;"
         ${!shop.isOpen ? 'disabled' : ''}
       >
