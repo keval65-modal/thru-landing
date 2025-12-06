@@ -2,8 +2,8 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { ShopMarkerData } from '@/types/map-types';
-import { ShopInfoWindow } from './ShopInfoWindow';
+import { ShopMarkerData, ShopCategory } from '@/types/map-types';
+import { getTodayHours } from '@/utils/operating-hours';
 
 interface ShopMapProps {
   shops: ShopMarkerData[];
@@ -21,6 +21,93 @@ const CATEGORY_COLORS = {
   other: '#6B7280'
 };
 
+// Category labels and colors for badges
+const CATEGORY_INFO = {
+  [ShopCategory.CAFE]: { label: 'Cafe', color: '#f59e0b' },
+  [ShopCategory.RESTAURANT]: { label: 'Restaurant', color: '#f97316' },
+  [ShopCategory.MEDICAL]: { label: 'Medical', color: '#dc2626' },
+  [ShopCategory.GROCERY]: { label: 'Grocery', color: '#16a34a' },
+  [ShopCategory.OTHER]: { label: 'Other', color: '#6b7280' }
+};
+
+// Generate HTML content for info window
+function createInfoWindowContent(shop: ShopMarkerData): string {
+  const categoryInfo = CATEGORY_INFO[shop.category];
+  const todayHours = getTodayHours(shop.operatingHours);
+  
+  return `
+    <div style="padding: 12px; min-width: 280px; max-width: 320px; font-family: system-ui, -apple-system, sans-serif;">
+      <!-- Header -->
+      <div style="margin-bottom: 8px;">
+        <div style="display: flex; align-items: start; justify-content: space-between; gap: 8px; margin-bottom: 4px;">
+          <h3 style="margin: 0; font-size: 16px; font-weight: 600; line-height: 1.3;">${shop.name}</h3>
+          <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background-color: ${categoryInfo.color}20; color: ${categoryInfo.color}; white-space: nowrap;">
+            ${categoryInfo.label}
+          </span>
+        </div>
+        
+        <!-- Status badge -->
+        <span style="display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; ${shop.isOpen ? 'background-color: #16a34a; color: white;' : 'background-color: #9ca3af; color: white;'}">
+          ${shop.isOpen ? 'Open Now' : 'Closed'}
+        </span>
+      </div>
+
+      <!-- Address -->
+      ${shop.address ? `
+        <div style="display: flex; align-items: start; gap: 8px; margin-bottom: 8px; font-size: 13px; color: #4b5563;">
+          <svg style="width: 16px; height: 16px; margin-top: 2px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"></path>
+          </svg>
+          <span style="line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">${shop.address}</span>
+        </div>
+      ` : ''}
+
+      <!-- Operating hours -->
+      <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 13px; color: #4b5563;">
+        <svg style="width: 16px; height: 16px; flex-shrink: 0;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        <span>${todayHours}</span>
+      </div>
+
+      <!-- Contact info -->
+      ${shop.phone || shop.email ? `
+        <div style="margin-bottom: 12px;">
+          ${shop.phone ? `
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280; margin-bottom: 4px;">
+              <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path>
+              </svg>
+              <span>${shop.phone}</span>
+            </div>
+          ` : ''}
+          ${shop.email ? `
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 12px; color: #6b7280;">
+              <svg style="width: 14px; height: 14px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+              </svg>
+              <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${shop.email}</span>
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      <!-- Action button -->
+      <button 
+        onclick="window.location.href='/home?vendor=${shop.id}'"
+        style="width: 100%; padding: 8px 16px; border: none; border-radius: 6px; font-size: 14px; font-weight: 500; cursor: ${shop.isOpen ? 'pointer' : 'not-allowed'}; ${shop.isOpen ? 'background-color: #000; color: white;' : 'background-color: #e5e7eb; color: #9ca3af;'} display: flex; align-items: center; justify-content: center; gap: 8px;"
+        ${!shop.isOpen ? 'disabled' : ''}
+      >
+        <svg style="width: 16px; height: 16px;" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"></path>
+        </svg>
+        ${shop.isOpen ? 'Place Order' : 'Closed'}
+      </button>
+    </div>
+  `;
+}
+
 export function ShopMap({ shops, userLocation, onShopSelect, className = '' }: ShopMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
@@ -28,7 +115,6 @@ export function ShopMap({ shops, userLocation, onShopSelect, className = '' }: S
   const infoWindowRef = useRef<google.maps.InfoWindow | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedShop, setSelectedShop] = useState<ShopMarkerData | null>(null);
 
   useEffect(() => {
     // Check if Google Maps is loaded
@@ -109,17 +195,13 @@ export function ShopMap({ shops, userLocation, onShopSelect, className = '' }: S
 
         // Add click listener
         marker.addListener('click', () => {
-          setSelectedShop(shop);
           if (onShopSelect) {
             onShopSelect(shop);
           }
 
-          // Create info window content container
-          const contentDiv = document.createElement('div');
-          contentDiv.id = `info-window-${shop.id}`;
-          
+          // Set info window content as HTML string
           if (infoWindowRef.current) {
-            infoWindowRef.current.setContent(contentDiv);
+            infoWindowRef.current.setContent(createInfoWindowContent(shop));
             infoWindowRef.current.open(map, marker);
           }
         });
@@ -182,23 +264,6 @@ export function ShopMap({ shops, userLocation, onShopSelect, className = '' }: S
       }
     };
   }, [shops, userLocation, onShopSelect]);
-
-  // Render info window content when selectedShop changes
-  useEffect(() => {
-    if (selectedShop) {
-      const contentDiv = document.getElementById(`info-window-${selectedShop.id}`);
-      if (contentDiv) {
-        const root = document.createElement('div');
-        contentDiv.appendChild(root);
-        
-        // Use React to render the info window content
-        import('react-dom/client').then(({ createRoot }) => {
-          const reactRoot = createRoot(root);
-          reactRoot.render(<ShopInfoWindow shop={selectedShop} />);
-        });
-      }
-    }
-  }, [selectedShop]);
 
   if (error) {
     return (
