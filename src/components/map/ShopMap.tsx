@@ -35,14 +35,8 @@ function createInfoWindowContent(shop: ShopMarkerData): string {
   const categoryInfo = CATEGORY_INFO[shop.category];
   const todayHours = getTodayHours(shop.operatingHours);
   
-  // Determine redirect URL based on shop category
-  let redirectUrl = '';
-  if (shop.category === ShopCategory.GROCERY) {
-    redirectUrl = `/home?selectedVendor=${shop.id}&category=grocery&from=map`;
-  } else {
-    // For restaurants, cafes, etc. - go to home with vendor pre-selected
-    redirectUrl = `/home?selectedVendor=${shop.id}&category=${shop.category}&from=map`;
-  }
+  // Determine redirect URL - go to dedicated vendor ordering page
+  const redirectUrl = `/vendor/${shop.id}`;
   
   return `
     <div style="padding: 12px; min-width: 280px; max-width: 320px; font-family: system-ui, -apple-system, sans-serif;">
