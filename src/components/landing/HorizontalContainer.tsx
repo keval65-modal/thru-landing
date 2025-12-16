@@ -36,10 +36,10 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
       
       {/* Snap Points Helper - Invisible divs that force the scroll to snap */}
       <div className="absolute inset-0 w-full h-full pointer-events-none">
-         <div className="h-[100dvh] w-full snap-start" /> {/* Page 1 */}
-         <div className="h-[100dvh] w-full snap-start" /> {/* Page 2 */}
-         <div className="h-[100dvh] w-full snap-start" /> {/* Page 3 */}
-         <div className="h-[100dvh] w-full snap-start" /> {/* Page 4 */}
+         <div className="h-[100dvh] w-full snap-start" style={{ scrollSnapStop: 'always' }} /> {/* Page 1 */}
+         <div className="h-[100dvh] w-full snap-start" style={{ scrollSnapStop: 'always' }} /> {/* Page 2 */}
+         <div className="h-[100dvh] w-full snap-start" style={{ scrollSnapStop: 'always' }} /> {/* Page 3 */}
+         <div className="h-[100dvh] w-full snap-start" style={{ scrollSnapStop: 'always' }} /> {/* Page 4 */}
       </div> 
       
       {/* Sticky Viewport: use dvh to prevent mobile address bar jumps */}
