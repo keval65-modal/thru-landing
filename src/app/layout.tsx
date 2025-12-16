@@ -25,8 +25,10 @@ export default function RootLayout({
           strategy="beforeInteractive"
         />
       </head>
-      <body className="font-body antialiased">
-        {children}
+      <body className="font-body antialiased overscroll-none">
+        <ReactLenis root options={{ lerp: 0.1, duration: 1.5, smoothWheel: true }}>
+            {children}
+        </ReactLenis>
         <Toaster />
       </body>
     </html>
