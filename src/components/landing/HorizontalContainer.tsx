@@ -30,7 +30,8 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
 
   return (
     // Height determines how long we scroll vertically to get through the horizontal content
-    <div ref={containerRef} className="relative h-[200vh] md:h-[300vh]"> 
+    // UPDATED: Reduced to 150vh on mobile to remove "driving space at the end" / make it punchier
+    <div ref={containerRef} className="relative h-[150vh] md:h-[300vh]"> 
       
       {/* Sticky Viewport: The "Window" into the horizontal world */}
       <div className="sticky top-0 left-0 h-screen w-full overflow-hidden bg-gradient-to-b from-sky-100 to-white">
