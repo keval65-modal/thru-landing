@@ -30,8 +30,17 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
 
   return (
     // Height determines how long we scroll vertically to get through the horizontal content
-    // UPDATED: 135vh - Aggressively reduced to eliminate "space at the end". Fast, snappy drive.
-    <div ref={containerRef} className="relative h-[135vh] md:h-[300vh]"> 
+    // UPDATED: 400dvh to provide 4 distinct "pages" of scroll.
+    // Coupled with snap-start elements, this creates a "one scroll per page" effect.
+    <div ref={containerRef} className="relative h-[400dvh]"> 
+      
+      {/* Snap Points Helper - Invisible divs that force the scroll to snap */}
+      <div className="absolute inset-0 w-full h-full pointer-events-none">
+         <div className="h-[100dvh] w-full snap-start" /> {/* Page 1 */}
+         <div className="h-[100dvh] w-full snap-start" /> {/* Page 2 */}
+         <div className="h-[100dvh] w-full snap-start" /> {/* Page 3 */}
+         <div className="h-[100dvh] w-full snap-start" /> {/* Page 4 */}
+      </div> 
       
       {/* Sticky Viewport: use dvh to prevent mobile address bar jumps */}
       <div className="sticky top-0 left-0 h-screen md:h-screen w-full overflow-hidden bg-gradient-to-b from-sky-100 to-white" style={{ height: '100dvh' }}>
