@@ -4,35 +4,23 @@ import { motion, useScroll, useVelocity, useSpring, useTransform } from 'framer-
 
 export const SideCar = ({ className }: { className?: string }) => {
   // Enhanced physics animation:
-  // 1. Detect scroll velocity to determine direction and speed.
-  // 2. Tilt the car: Front rises (rotate negative) when moving forward (scrolling down).
-  // 3. Back rises (rotate positive) when moving backward (scrolling up).
-
   const { scrollY } = useScroll();
   const scrollVelocity = useVelocity(scrollY);
   
   // Smooth out the velocity for less jittery rotation
   const smoothVelocity = useSpring(scrollVelocity, { damping: 50, stiffness: 400 });
 
-  // Wheel rotation (keep as is, maybe adjust multiplier)
+  // Wheel rotation
   const smoothScroll = useSpring(scrollY, { damping: 50, stiffness: 400 }); 
   const wheelRotate = useTransform(smoothScroll, [0, 5000], [0, 360 * 15]);
 
   // Car Body Tilt
-  // Velocity Range is roughly -2000 to 2000 depending on scroll speed.
-  // We want a max tilt of approx 3-5 degrees.
-  // Forward (positive velocity) -> Front rises -> Negative Rotation
-  // UPDATED: Hyper-sensitive for mobile touch flicks.
-  // The scroll distance on mobile is short (400px), so velocity spikes are brief.
-  // We lower the range drastically to [-100, 100] to catch even small flicks.
-  const rawTilt = useTransform(smoothVelocity, [-100, 100], [12, -12]); 
-  // Lower damping to let it swing more freely, stiffness to snap back
-  const smoothTilt = useSpring(rawTilt, { damping: 15, stiffness: 150 });
+  // UPDATED: Reduced sensitivity to [-4, 4] degrees to prevent tire collision
+  const rawTilt = useTransform(smoothVelocity, [-100, 100], [5, -5]); 
+  const smoothTilt = useSpring(rawTilt, { damping: 20, stiffness: 150 });
 
-  // Suspension Bounce (Vertical) - Reacts to velocity 'bumps'
-  // When velocity is high, sink slightly (downforce/speed) -> actually let's keep the idle bounce
-  // effectively mixed with some velocity reaction.
-  const velocityY = useTransform(smoothVelocity, [-600, 600], [1, -1]);
+  // Suspension Bounce (Vertical)
+  const velocityY = useTransform(smoothVelocity, [-400, 400], [1, -1]);
   const smoothVelocityY = useSpring(velocityY, { damping: 20, stiffness: 200 });
 
   return (
@@ -43,25 +31,32 @@ export const SideCar = ({ className }: { className?: string }) => {
         <svg width="0" height="0">
           <defs>
             <linearGradient id="carBodyGradient" x1="0" x2="0" y1="0" y2="1">
-              <stop offset="0%" stopColor="#F87171" /> {/* Lighter Red */}
-              <stop offset="100%" stopColor="#DC2626" /> {/* Darker Red */}
+              <stop offset="0%" stopColor="#EF4444" /> {/* Red */}
+              <stop offset="100%" stopColor="#B91C1C" /> {/* Dark Red */}
             </linearGradient>
             <linearGradient id="windowGradient" x1="0" x2="0" y1="0" y2="1">
-               <stop offset="0%" stopColor="#A5F3FC" stopOpacity="0.6" />
-               <stop offset="100%" stopColor="#0891B2" stopOpacity="0.8" />
+               <stop offset="0%" stopColor="#E0F2FE" stopOpacity="0.9" />
+               <stop offset="100%" stopColor="#38BDF8" stopOpacity="0.6" />
             </linearGradient>
+            <filter id="glow">
+                <feGaussianBlur stdDeviation="2.5" result="coloredBlur"/>
+                <feMerge>
+                    <feMergeNode in="coloredBlur"/>
+                    <feMergeNode in="SourceGraphic"/>
+                </feMerge>
+            </filter>
           </defs>
         </svg>
 
         {/* Car Body Group */}
         <motion.div
-             // Idle Bounce + Tilt
+             // Idle Bounce Animation - "Car is On"
              animate={{ y: [0, -2, 0] }}
-             transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }}
+             transition={{ duration: 0.6, repeat: Infinity, ease: "easeInOut" }} // Faster bobbing for engine idle
              style={{ 
                 rotate: smoothTilt,
                 y: smoothVelocityY,
-                transformOrigin: "center bottom" 
+                transformOrigin: "center 80%" // Pivot closer to wheels to reduce clipping
              }}
              className="w-full h-full will-change-transform"
         >
@@ -69,84 +64,66 @@ export const SideCar = ({ className }: { className?: string }) => {
                 viewBox="0 0 300 120"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="w-full h-full drop-shadow-2xl"
+                className="w-full h-full drop-shadow-xl"
             >
-                {/* Sleek Modern Coupe Design */}
+                {/* IMPROVED CAR MODEL: More curved, modern hatchback/SUV crossover style */}
                 
-                {/* Main Chassis */}
+                {/* Main Body */}
                 <path
-                    d="M10 80 L20 60 L60 50 L120 40 L190 40 L260 55 L290 65 L290 90 L275 95 L25 95 L10 80 Z"
+                    d="M10 85 L25 55 L70 45 L130 35 L220 35 L270 55 L290 65 L290 90 L275 95 L25 95 L10 85 Z"
                     fill="url(#carBodyGradient)"
-                    stroke="#991B1B"
+                    stroke="#7F1D1D"
                     strokeWidth="1"
                 />
                 
-                {/* Roof / Greenhouse - Lower, sleeker */}
+                {/* Roof / Greenhouse */}
                 <path
-                    d="M65 50 L100 25 L210 25 L245 55 L65 55 Z"
-                    className="fill-zinc-800"
+                    d="M75 45 L110 20 L200 20 L235 50 L75 45 Z"
+                    className="fill-slate-800"
                 />
                 
-                {/* Windows - Gradient */}
+                {/* Windows */}
                 <path
-                    d="M105 30 L205 30 L235 50 L70 50 Z"
+                    d="M115 25 L195 25 L225 45 L80 45 Z"
                     fill="url(#windowGradient)"
                 />
-                 {/* Window Pillars */}
-                <path d="M155 30 L155 50" className="stroke-zinc-900 stroke-[3]" />
+                <path d="M155 25 L155 45" className="stroke-slate-900 stroke-[4]" />
 
-                {/* Side Body Contour Line */}
-                <path d="M30 65 L270 65" className="stroke-white/20 stroke-[2]" />
-                <path d="M30 65 L270 65" className="stroke-black/10 stroke-[1] transform translate-y-[1px]" />
+                {/* Side Accents */}
+                <path d="M25 70 L275 60" className="stroke-white/20 stroke-[3]" />
 
-                {/* Wheel Wells - Tighter fit */}
-                 <path d="M45 95 A 32 32 0 0 1 109 95 Z" className="fill-[#222]" />
-                 <path d="M210 95 A 32 32 0 0 1 274 95 Z" className="fill-[#222]" />
+                {/* Wheel Wells - Darker */}
+                 <path d="M45 95 A 34 34 0 0 1 113 95 Z" className="fill-[#1a1a1a]" />
+                 <path d="M206 95 A 34 34 0 0 1 274 95 Z" className="fill-[#1a1a1a]" />
 
-                {/* Door Handles - Sleek flush */}
-                <rect x="120" y="62" width="20" height="4" className="fill-black/20" rx="1" />
-                <rect x="180" y="62" width="20" height="4" className="fill-black/20" rx="1" />
-
-                {/* Headlights - LED Strip style */}
-                <path d="M280 68 L290 66 L290 74 L280 72 Z" className="fill-amber-300 drop-shadow-md" />
+                {/* Headlights */}
+                <path d="M275 60 L290 62 L285 70 L270 65 Z" className="fill-yellow-200" filter="url(#glow)" />
                 
-                {/* Tail lights - Modern Strip */}
-                <path d="M10 65 L15 65 L15 75 L10 75 Z" className="fill-red-600 drop-shadow-md" />
-                
-                {/* Bumper details */}
-                <path d="M10 85 L290 85" className="stroke-black/10 stroke-1" />
+                {/* Tail lights */}
+                <path d="M10 60 L20 62 L20 70 L10 68 Z" className="fill-red-500" filter="url(#glow)" />
 
             </svg>
         </motion.div>
 
-        {/* Wheels - Detailed Alloys */}
-        {/* These need to move WITH the car body tilt/bounce if we want realism, 
-            but for simple "suspension" usually wheels stay planted while body moves.
-            However, our 'tilt' rotates the whole div. The wheels are children, so they will rotate with the body.
-            This gives a "popping a wheelie" effect which is what's requested (front rises).
-        */}
-
+        {/* Wheels - Static relative to container, rotating internally */}
         {/* Rear Wheel */}
         <motion.div 
             className="absolute will-change-transform"
             style={{ 
                 rotate: wheelRotate,
                 top: '55%', 
-                left: '16%',
+                left: '16.5%', // Adjusted for new body
                 width: '19%', 
                 height: 'auto',
                 aspectRatio: '1/1'
             }}
         >
              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
-                <circle cx="50" cy="50" r="48" className="fill-zinc-950" />
-                <circle cx="50" cy="50" r="32" className="fill-zinc-400" />
-                <circle cx="50" cy="50" r="12" className="fill-zinc-900" />
-                {/* Sport Spokes */}
-                <path d="M50 20 L55 50 L50 80 L45 50 Z" className="fill-zinc-600" />
-                <path d="M80 50 L50 55 L20 50 L50 45 Z" className="fill-zinc-600" />
-                <path d="M70 70 L52 52 L30 30" className="stroke-zinc-800 stroke-[4]" />
-                <path d="M30 70 L48 52 L70 30" className="stroke-zinc-800 stroke-[4]" />
+                <circle cx="50" cy="50" r="46" className="fill-zinc-950" />
+                <circle cx="50" cy="50" r="30" className="fill-zinc-500" />
+                <circle cx="50" cy="50" r="10" className="fill-zinc-900" />
+                <path d="M50 10 L55 50 L50 90 L45 50 Z" className="fill-zinc-300" />
+                <path d="M90 50 L50 55 L10 50 L50 45 Z" className="fill-zinc-300" />
              </svg>
         </motion.div>
 
@@ -156,21 +133,18 @@ export const SideCar = ({ className }: { className?: string }) => {
             style={{ 
                 rotate: wheelRotate,
                 top: '55%', 
-                left: '71%',
+                left: '70%', // Adjusted for new body
                 width: '19%',
                 height: 'auto',
                 aspectRatio: '1/1'
             }}
         >
              <svg viewBox="0 0 100 100" className="w-full h-full drop-shadow-lg">
-                <circle cx="50" cy="50" r="48" className="fill-zinc-950" />
-                <circle cx="50" cy="50" r="32" className="fill-zinc-400" />
-                <circle cx="50" cy="50" r="12" className="fill-zinc-900" />
-                {/* Sport Spokes */}
-                <path d="M50 20 L55 50 L50 80 L45 50 Z" className="fill-zinc-600" />
-                <path d="M80 50 L50 55 L20 50 L50 45 Z" className="fill-zinc-600" />
-                <path d="M70 70 L52 52 L30 30" className="stroke-zinc-800 stroke-[4]" />
-                <path d="M30 70 L48 52 L70 30" className="stroke-zinc-800 stroke-[4]" />
+                <circle cx="50" cy="50" r="46" className="fill-zinc-950" />
+                <circle cx="50" cy="50" r="30" className="fill-zinc-500" />
+                <circle cx="50" cy="50" r="10" className="fill-zinc-900" />
+                <path d="M50 10 L55 50 L50 90 L45 50 Z" className="fill-zinc-300" />
+                <path d="M90 50 L50 55 L10 50 L50 45 Z" className="fill-zinc-300" />
              </svg>
         </motion.div>
     </div>

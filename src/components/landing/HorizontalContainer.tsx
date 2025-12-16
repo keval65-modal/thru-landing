@@ -2,7 +2,7 @@
 import React, { useRef } from 'react';
 import { motion, useScroll, useTransform, useSpring } from 'framer-motion';
 import { SideCar } from './SideCar';
-import { Cloud } from 'lucide-react';
+import { Cloud, Apple, Pill, Pizza, Smartphone, Coffee } from 'lucide-react';
 
 export const HorizontalContainer = ({ children }: { children: React.ReactNode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -36,13 +36,21 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
       {/* Sticky Viewport: use dvh to prevent mobile address bar jumps */}
       <div className="sticky top-0 left-0 h-screen md:h-screen w-full overflow-hidden bg-gradient-to-b from-sky-100 to-white" style={{ height: '100dvh' }}>
         
-        {/* Sky/Background Layer */}
-        <motion.div style={{ x: cloudX }} className="absolute top-10 left-0 w-[400vw] flex justify-around opacity-50">
-            <Cloud className="w-32 h-32 text-white/80" />
-            <Cloud className="w-48 h-48 text-white/90" />
-            <Cloud className="w-24 h-24 text-white/70" />
-             <Cloud className="w-56 h-56 text-white/80" />
-             <Cloud className="w-32 h-32 text-white/60" />
+        {/* Background Pattern Layer - Items instead of Clouds */}
+        <motion.div style={{ x: cloudX }} className="absolute top-0 left-0 w-[400vw] h-full flex items-center justify-around opacity-20 pointer-events-none">
+             {/* Scattered background items */}
+             <div className="absolute top-[10%] left-[5%]"><Apple className="w-24 h-24 text-red-400" /></div>
+             <div className="absolute top-[20%] left-[15%]"><Pill className="w-16 h-16 text-blue-400" /></div>
+             <div className="absolute top-[15%] left-[25%]"><Coffee className="w-20 h-20 text-amber-600" /></div>
+             <div className="absolute top-[25%] left-[35%]"><Pizza className="w-28 h-28 text-orange-500" /></div>
+             <div className="absolute top-[10%] left-[45%]"><Smartphone className="w-16 h-16 text-slate-600" /></div>
+             
+             {/* Repeat pattern for length */}
+             <div className="absolute top-[18%] left-[55%]"><Apple className="w-20 h-20 text-green-500" /></div>
+             <div className="absolute top-[12%] left-[65%]"><Pill className="w-16 h-16 text-purple-400" /></div>
+             <div className="absolute top-[22%] left-[75%]"><Coffee className="w-24 h-24 text-amber-700" /></div>
+             <div className="absolute top-[15%] left-[85%]"><Pizza className="w-24 h-24 text-orange-600" /></div>
+             <div className="absolute top-[20%] left-[95%]"><Smartphone className="w-16 h-16 text-zinc-600" /></div>
         </motion.div>
 
         {/* Content Layer */}
