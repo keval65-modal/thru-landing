@@ -20,13 +20,13 @@ export default function LandingPage() {
           </div>
           <nav className="flex gap-3 items-center">
              <Button variant="ghost" asChild className="hidden md:flex text-gray-600 hover:text-primary">
-                 <Link href="/vendor-signup">Partner with Us</Link>
+                 <Link href="https://merchant.kiptech.in">Partner with Us</Link>
              </Button>
                <Button variant="outline" asChild className="border-gray-200">
-                 <Link href="/login">Login</Link>
+                 <Link href="https://app.kiptech.in">Login</Link>
                </Button>
                <Button asChild className="bg-primary hover:bg-primary/90 text-white shadow-lg shadow-primary/30">
-                 <Link href="/signup">Sign Up</Link>
+                 <Link href="https://app.kiptech.in">Sign Up</Link>
                </Button>
           </nav>
       </header>
@@ -46,7 +46,7 @@ export default function LandingPage() {
                  </p>
                  <div className="flex gap-4 items-center pointer-events-auto">
                     <Button size="lg" asChild className="h-12 md:h-14 px-6 md:px-8 text-base md:text-lg rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 transition-transform hover:scale-105">
-                        <Link href="/signup">Shop on the Go</Link>
+                        <Link href="https://app.kiptech.in">Shop on the Go</Link>
                     </Button>
                     <span className="text-sm font-medium text-gray-400 animate-pulse hidden md:inline-block">
                         Scroll Down to Drive →
@@ -73,7 +73,7 @@ export default function LandingPage() {
                         Support local businesses while saving time. Grab your morning brew, tonight's dinner elements, or pharmacy essentials.
                     </p>
                     <Button variant="outline" asChild className="rounded-full px-6 text-sm md:text-base">
-                        <Link href="/login">Explore All Shops</Link>
+                        <Link href="https://app.kiptech.in">Explore All Shops</Link>
                     </Button>
                 </div>
                 
@@ -158,10 +158,10 @@ export default function LandingPage() {
                     </p>
                     <div className="flex flex-col sm:flex-row justify-center gap-3 md:gap-4 w-full max-w-md">
                          <Button size="lg" asChild className="h-12 md:h-14 px-8 md:px-10 text-base md:text-lg rounded-full bg-primary hover:bg-primary/90 w-full sm:w-auto shadow-lg shadow-primary/20">
-                            <Link href="/signup">Get Started for Free</Link>
+                            <Link href="https://app.kiptech.in">Get Started for Free</Link>
                         </Button>
                          <Button size="lg" variant="outline" asChild className="h-12 md:h-14 px-8 md:px-10 text-base md:text-lg rounded-full border-gray-200 text-gray-600 hover:bg-gray-50 w-full sm:w-auto">
-                            <Link href="/login">Login</Link>
+                            <Link href="https://app.kiptech.in">Login</Link>
                         </Button>
                     </div>
                 </div>
@@ -172,7 +172,7 @@ export default function LandingPage() {
                     <div className="flex gap-6">
                         <Link href="/privacy" className="hover:text-primary transition-colors">Privacy</Link>
                         <Link href="/terms" className="hover:text-primary transition-colors">Terms</Link>
-                        <Link href="/vendor-signup" className="hover:text-primary transition-colors">Vendors</Link>
+                        <Link href="https://merchant.kiptech.in" className="hover:text-primary transition-colors">Vendors</Link>
                     </div>
                 </div>
             </div>
