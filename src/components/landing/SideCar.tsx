@@ -22,9 +22,12 @@ export const SideCar = ({ className }: { className?: string }) => {
   // Velocity Range is roughly -2000 to 2000 depending on scroll speed.
   // We want a max tilt of approx 3-5 degrees.
   // Forward (positive velocity) -> Front rises -> Negative Rotation
-  // UPDATED: Made more sensitive (-600 to 600) and slightly steeper (5 deg) for visibility on mobile
-  const rawTilt = useTransform(smoothVelocity, [-600, 600], [5, -5]); 
-  const smoothTilt = useSpring(rawTilt, { damping: 25, stiffness: 200 });
+  // UPDATED: Hyper-sensitive for mobile touch flicks.
+  // The scroll distance on mobile is short (400px), so velocity spikes are brief.
+  // We lower the range drastically to [-100, 100] to catch even small flicks.
+  const rawTilt = useTransform(smoothVelocity, [-100, 100], [12, -12]); 
+  // Lower damping to let it swing more freely, stiffness to snap back
+  const smoothTilt = useSpring(rawTilt, { damping: 15, stiffness: 150 });
 
   // Suspension Bounce (Vertical) - Reacts to velocity 'bumps'
   // When velocity is high, sink slightly (downforce/speed) -> actually let's keep the idle bounce
