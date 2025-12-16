@@ -30,8 +30,8 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
 
   return (
     // Height determines how long we scroll vertically to get through the horizontal content
-    // UPDATED: 175vh provides a sweet spot. 150vh was too fast/short for animation to register.
-    <div ref={containerRef} className="relative h-[175vh] md:h-[300vh]"> 
+    // UPDATED: 135vh - Aggressively reduced to eliminate "space at the end". Fast, snappy drive.
+    <div ref={containerRef} className="relative h-[135vh] md:h-[300vh]"> 
       
       {/* Sticky Viewport: use dvh to prevent mobile address bar jumps */}
       <div className="sticky top-0 left-0 h-screen md:h-screen w-full overflow-hidden bg-gradient-to-b from-sky-100 to-white" style={{ height: '100dvh' }}>
