@@ -112,7 +112,7 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
           </motion.div>
           
           {/* Road Layer */}
-          <div className="absolute bottom-0 left-0 w-full h-32 bg-[#333] border-t-4 border-gray-400 z-10 flex items-center overflow-hidden">
+          <div className="absolute bottom-0 left-0 w-full h-32 bg-[#333] border-t-4 border-gray-400 z-0 flex items-center overflow-hidden">
                <motion.div 
                   style={{ x: roadX, width: totalWidth }}
                   className="flex gap-32"
@@ -124,7 +124,7 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
           </div>
           
           {/* Car */}
-          <div className="absolute bottom-20 left-[10%] z-20">
+          <div className="absolute bottom-20 left-[10%] z-10">
                <SideCar />
           </div>
 
