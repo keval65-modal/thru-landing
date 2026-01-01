@@ -10,6 +10,7 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
   const containerRef = useRef<HTMLDivElement>(null);
   const waitlistRef = useRef<HTMLElement | null>(null);
   const hasShownRef = useRef(false);
+  const layoutReadyRef = useRef(false);
 
   const childArray = React.Children.toArray(children);
   const sectionCount = Math.max(childArray.length, 1);
@@ -47,8 +48,14 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
     const handle = () => {
       const el = containerRef.current;
       if (!el) return;
+      const height = el.offsetHeight;
+      if (height <= window.innerHeight * 0.5) return; // skip until layout is ready
+      layoutReadyRef.current = true;
+
       const top = el.offsetTop;
-      const end = top + el.offsetHeight - window.innerHeight;
+      const end = top + height - window.innerHeight;
+      if (end <= 0) return;
+
       const atEnd = window.scrollY >= end - 12; // trigger just before hard stop (mobile friendly)
       if (window.scrollY > end) window.scrollTo({ top: end, behavior: 'auto' });
 
@@ -59,11 +66,18 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
         scrollToWaitlist(); // bring user back to the final page immediately on trigger
       } else if (!atEnd) {
         hasShownRef.current = false;
+        setShowEndNotice(false);
       }
     };
     window.addEventListener('scroll', handle, { passive: true });
-    // Run once so mobile users who start near the bottom still see the popup
-    handle();
+    // Run once after layout paint to avoid premature trigger on first render
+    requestAnimationFrame(() => {
+      if (layoutReadyRef.current) {
+        handle();
+      } else {
+        setTimeout(handle, 50);
+      }
+    });
     return () => window.removeEventListener('scroll', handle);
   }, []);
 
