@@ -11,7 +11,7 @@ import { useEffect } from 'react';
 import { WaitlistForm } from '@/components/landing/WaitlistForm';
 
 export default function LandingPage() {
-  // Ensure we always start at the first section on load
+  // Ensure we always start at the first section on load - Trigger Deploy
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'auto' });
   }, []);
