@@ -2,7 +2,6 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import Script from 'next/script';
-import { ReactLenis } from '@studio-freight/react-lenis';
 
 export const metadata: Metadata = {
   title: 'Thru',
@@ -15,7 +14,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="snap-y snap-mandatory scroll-smooth overscroll-none">
+    <html lang="en" className="scroll-smooth overscroll-none">
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
@@ -26,9 +25,7 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased overscroll-none">
-        <ReactLenis root options={{ lerp: 0.1, duration: 1.5, smoothWheel: true }}>
-            {children}
-        </ReactLenis>
+        {children}
         <Toaster />
       </body>
     </html>
