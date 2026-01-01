@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 
 export const HorizontalContainer = ({ children }: { children: React.ReactNode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
+  const waitlistRef = useRef<HTMLElement | null>(null);
 
   const childArray = React.Children.toArray(children);
   const sectionCount = Math.max(childArray.length, 1);
@@ -29,6 +30,17 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
   const cloudX = useTransform(smoothProgress, [0, 1], ["0%", "-35%"]);
   const roadX = useTransform(smoothProgress, [0, 1], ["0%", endX]);
 
+  // Smoothly return user to the final (4th) page / waitlist section.
+  const scrollToWaitlist = () => {
+    if (!waitlistRef.current) {
+      waitlistRef.current = document.getElementById('waitlist') as HTMLElement | null;
+    }
+    const el = waitlistRef.current;
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   // Stop scrolling past the 4th page; show end notice and clamp position.
   useEffect(() => {
     const handle = () => {
@@ -39,6 +51,9 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
       const atEnd = window.scrollY >= end - 12; // trigger just before hard stop (mobile friendly)
       if (window.scrollY > end) window.scrollTo({ top: end, behavior: 'auto' });
       setShowEndNotice(atEnd);
+      if (atEnd) {
+        scrollToWaitlist(); // bring user back to the final page immediately on trigger
+      }
     };
     window.addEventListener('scroll', handle, { passive: true });
     // Run once so mobile users who start near the bottom still see the popup
@@ -104,12 +119,14 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
             </p>
             <div className="flex justify-center">
               <Button
-                asChild
+                type="button"
                 className="px-6"
-                onClick={() => setShowEndNotice(false)}
+                onClick={() => {
+                  setShowEndNotice(false);
+                  scrollToWaitlist(); // return to 4th page when clicking CTA
+                }}
               >
-                {/* Send users to the on-page waitlist form instead of the app signup */}
-                <Link href="#waitlist">Sign Up</Link>
+                Sign Up
               </Button>
             </div>
             <p className="text-gray-500 text-xs">We’ll notify you when we’re live! 🚗</p>
