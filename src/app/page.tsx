@@ -51,9 +51,6 @@ export default function LandingPage() {
                   <p className="text-sm md:text-lg text-gray-600 mb-6 md:mb-8 max-w-xs mx-auto md:mx-0">
                       Support local businesses while saving time. Grab your morning brew, tonight's dinner elements, or pharmacy essentials.
                   </p>
-                  <Button variant="outline" asChild className="rounded-full px-6 text-sm md:text-base">
-                      <Link href="https://app.kiptech.in">Explore All Shops</Link>
-                  </Button>
               </div>
               
               <div className="flex-1 grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6 scale-90 md:scale-100 origin-center">
