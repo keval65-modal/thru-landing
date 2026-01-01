@@ -3,10 +3,10 @@ import React from 'react';
 export const ShopFronts = () => {
   return (
     // Adjusted positioning and scale for small screens to avoid overlaps
-    <div className="absolute right-0 bottom-14 sm:bottom-20 md:bottom-32 flex items-end gap-1 md:gap-2 opacity-100 z-0 origin-bottom-right transform scale-[0.48] sm:scale-[0.6] md:scale-100 pr-2 sm:pr-4 md:pr-0">
+    <div className="absolute right-0 bottom-14 sm:bottom-20 md:bottom-32 flex items-end gap-1 md:gap-2 opacity-100 z-20 origin-bottom-right transform scale-[0.48] sm:scale-[0.6] md:scale-100 pr-2 sm:pr-4 md:pr-0">
         
        {/* Shop 1: Coffee Shop (Amber/Brown) */}
-       <div className="relative w-32 h-40 md:w-40 md:h-48 bg-amber-50 rounded-t-xl border-4 border-amber-900 border-b-0 flex flex-col justify-end items-center mx-2">
+       <div className="relative w-32 h-40 md:w-40 md:h-48 bg-amber-50 rounded-t-xl border-4 border-amber-900 border-b-0 flex flex-col justify-end items-center mx-2 drop-shadow-md">
              {/* Awning */}
              <div className="absolute -top-4 w-36 md:w-44 h-8 bg-stripes-amber rounded-sm shadow-md" style={{ 
                  backgroundImage: 'repeating-linear-gradient(90deg, #d97706, #d97706 10px, #fcd34d 10px, #fcd34d 20px)' 
@@ -23,7 +23,7 @@ export const ShopFronts = () => {
        </div>
 
        {/* Shop 2: Supermarket (Emerald/Green) - Taller */}
-       <div className="relative w-48 h-56 md:w-56 md:h-64 bg-emerald-50 rounded-t-lg border-4 border-emerald-900 border-b-0 flex flex-col justify-end items-center mx-2 z-10">
+       <div className="relative w-48 h-56 md:w-56 md:h-64 bg-emerald-50 rounded-t-lg border-4 border-emerald-900 border-b-0 flex flex-col justify-end items-center mx-2 z-10 drop-shadow-md">
              {/* Awning */}
              <div className="absolute -top-4 w-52 md:w-60 h-8 rounded-sm shadow-md" style={{ 
                  backgroundImage: 'repeating-linear-gradient(90deg, #059669, #059669 10px, #6ee7b7 10px, #6ee7b7 20px)' 
@@ -44,7 +44,7 @@ export const ShopFronts = () => {
        </div>
 
        {/* Shop 3: Bakery (Orange) */}
-       <div className="relative w-28 h-36 md:w-36 md:h-40 bg-orange-50 rounded-t-xl border-4 border-orange-900 border-b-0 flex flex-col justify-end items-center mx-2">
+       <div className="relative w-28 h-36 md:w-36 md:h-40 bg-orange-50 rounded-t-xl border-4 border-orange-900 border-b-0 flex flex-col justify-end items-center mx-2 drop-shadow-md">
              {/* Awning */}
              <div className="absolute -top-4 w-32 md:w-40 h-8 rounded-t-full shadow-md" style={{ 
                  backgroundImage: 'repeating-linear-gradient(45deg, #ea580c, #ea580c 10px, #fdba74 10px, #fdba74 20px)' 
