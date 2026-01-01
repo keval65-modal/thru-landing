@@ -11,6 +11,7 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
   const waitlistRef = useRef<HTMLElement | null>(null);
   const hasShownRef = useRef(false);
   const layoutReadyRef = useRef(false);
+  const [showScrollHint, setShowScrollHint] = useState(true);
 
   const childArray = React.Children.toArray(children);
   const sectionCount = Math.max(childArray.length, 1);
@@ -86,6 +87,18 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
     return () => unsub();
   }, [scrollYProgress]);
 
+  // Gentle nudge to scroll; hide after interaction or a short delay.
+  useEffect(() => {
+    const hide = () => setShowScrollHint(false);
+    const onScroll = () => hide();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    const timer = setTimeout(hide, 6500);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      clearTimeout(timer);
+    };
+  }, []);
+
   return (
     <div ref={containerRef} className="relative" style={{ height: totalHeight }}>
       
@@ -135,6 +148,14 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
 
         </div>
       </div>
+      {showScrollHint && (
+        <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-[55]">
+          <div className="flex items-center gap-2 rounded-full bg-white/90 border border-gray-200 shadow-lg px-4 py-2 text-sm text-gray-700">
+            <span className="animate-pulse text-primary font-semibold">Scroll to explore</span>
+            <span className="text-xs text-gray-500">Swipe ↓</span>
+          </div>
+        </div>
+      )}
       {showEndNotice && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm px-6">
           <div className="max-w-sm w-full rounded-2xl bg-white shadow-2xl p-6 text-center space-y-3">
