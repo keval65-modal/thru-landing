@@ -36,28 +36,15 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
       if (!el) return;
       const top = el.offsetTop;
       const end = top + el.offsetHeight - window.innerHeight;
-      if (window.scrollY > end) {
-        window.scrollTo({ top: end, behavior: 'auto' });
-      }
+      const atEnd = window.scrollY >= end - 12; // trigger just before hard stop (mobile friendly)
+      if (window.scrollY > end) window.scrollTo({ top: end, behavior: 'auto' });
+      setShowEndNotice(atEnd);
     };
     window.addEventListener('scroll', handle, { passive: true });
+    // Run once so mobile users who start near the bottom still see the popup
+    handle();
     return () => window.removeEventListener('scroll', handle);
   }, []);
-
-  useEffect(() => {
-    const unsub = scrollYProgress.on('change', (v) => {
-      // Trigger as soon as the user reaches the end of the content (4th page)
-      // We use 0.99 to ensure it hits just before the hard scroll stop for a snappy feel
-      if (v >= 0.99) {
-        setShowEndNotice(true);
-      } else if (v < 0.95) {
-        setShowEndNotice(false);
-      }
-    });
-    return () => {
-      unsub();
-    };
-  }, [scrollYProgress]);
 
   return (
     <div ref={containerRef} className="relative" style={{ height: totalHeight }}>
