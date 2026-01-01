@@ -56,18 +56,8 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
       const end = top + height - window.innerHeight;
       if (end <= 0) return;
 
-      const atEnd = window.scrollY >= end - 12; // trigger just before hard stop (mobile friendly)
+      const atEnd = window.scrollY >= end - 12; // trigger just before hard stop
       if (window.scrollY > end) window.scrollTo({ top: end, behavior: 'auto' });
-
-      // Trigger once per reach; avoid rapid re-open while user is at the end
-      if (atEnd && !hasShownRef.current) {
-        hasShownRef.current = true;
-        setShowEndNotice(true);
-        scrollToWaitlist(); // bring user back to the final page immediately on trigger
-      } else if (!atEnd) {
-        hasShownRef.current = false;
-        setShowEndNotice(false);
-      }
     };
     window.addEventListener('scroll', handle, { passive: true });
     // Run once after layout paint to avoid premature trigger on first render
@@ -80,6 +70,21 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
     });
     return () => window.removeEventListener('scroll', handle);
   }, []);
+
+  // Trigger popup as car reaches end of 4th page; reset when user scrolls back.
+  useEffect(() => {
+    const unsub = scrollYProgress.on('change', (v) => {
+      if (v >= 0.97 && !hasShownRef.current) {
+        hasShownRef.current = true;
+        setShowEndNotice(true);
+        scrollToWaitlist();
+      } else if (v < 0.9) {
+        hasShownRef.current = false;
+        setShowEndNotice(false);
+      }
+    });
+    return () => unsub();
+  }, [scrollYProgress]);
 
   return (
     <div ref={containerRef} className="relative" style={{ height: totalHeight }}>
