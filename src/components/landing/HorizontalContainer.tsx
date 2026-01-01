@@ -121,7 +121,8 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
                 className="px-6"
                 onClick={() => setShowEndNotice(false)}
               >
-                <Link href="/signup">Sign Up</Link>
+                {/* Send users to the on-page waitlist form instead of the app signup */}
+                <Link href="#waitlist">Sign Up</Link>
               </Button>
             </div>
             <p className="text-gray-500 text-xs">We’ll notify you when we’re live! 🚗</p>
