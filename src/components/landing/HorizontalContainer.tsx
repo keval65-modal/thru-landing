@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 export const HorizontalContainer = ({ children }: { children: React.ReactNode }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const waitlistRef = useRef<HTMLElement | null>(null);
+  const hasShownRef = useRef(false);
 
   const childArray = React.Children.toArray(children);
   const sectionCount = Math.max(childArray.length, 1);
@@ -50,9 +51,14 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
       const end = top + el.offsetHeight - window.innerHeight;
       const atEnd = window.scrollY >= end - 12; // trigger just before hard stop (mobile friendly)
       if (window.scrollY > end) window.scrollTo({ top: end, behavior: 'auto' });
-      setShowEndNotice(atEnd);
-      if (atEnd) {
+
+      // Trigger once per reach; avoid rapid re-open while user is at the end
+      if (atEnd && !hasShownRef.current) {
+        hasShownRef.current = true;
+        setShowEndNotice(true);
         scrollToWaitlist(); // bring user back to the final page immediately on trigger
+      } else if (!atEnd) {
+        hasShownRef.current = false;
       }
     };
     window.addEventListener('scroll', handle, { passive: true });
@@ -123,6 +129,7 @@ export const HorizontalContainer = ({ children }: { children: React.ReactNode })
                 className="px-6"
                 onClick={() => {
                   setShowEndNotice(false);
+                  hasShownRef.current = true; // prevent re-opening immediately
                   scrollToWaitlist(); // return to 4th page when clicking CTA
                 }}
               >
