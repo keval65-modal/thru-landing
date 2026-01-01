@@ -28,16 +28,16 @@ export const RouteSection = () => {
     const progressWidth = useTransform(scrollYProgress, [0.25, 0.55], ["0%", "100%"]);
 
     return (
-        <div className="w-screen h-full flex-shrink-0 flex items-center justify-center px-12 bg-white/50 border-r border-dashed border-gray-200">
-             <div className="grid md:grid-cols-2 gap-16 items-center max-w-6xl w-full">
+        <div className="w-screen h-full flex-shrink-0 flex items-center justify-center px-6 md:px-12 bg-white/50 border-r border-dashed border-gray-200">
+             <div className="grid md:grid-cols-2 gap-8 md:gap-16 items-center max-w-6xl w-full">
                 <div className="order-2 md:order-1 relative flex justify-center">
                     {/* Visual: Straight Route with Stops */}
-                     <div className="bg-white p-8 rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md">
-                         <div className="flex justify-between text-xs font-bold text-gray-400 mb-6 uppercase tracking-wider">
+                    <div className="bg-white p-5 md:p-8 rounded-2xl shadow-2xl border border-gray-100 w-full max-w-md">
+                        <div className="flex justify-between text-[11px] md:text-xs font-bold text-gray-400 mb-5 md:mb-6 uppercase tracking-wider">
                              <span>Office</span>
                              <span>Home</span>
                          </div>
-                         <div className="relative flex items-center justify-between h-12">
+                        <div className="relative flex items-center justify-between h-12">
                              {/* The Route Path (Background) */}
                              <div className="absolute top-1/2 left-0 w-full h-2 bg-gray-100 rounded-full -translate-y-1/2 overflow-hidden">
                                   {/* The Progress Bar (Foreground) */}
@@ -71,12 +71,12 @@ export const RouteSection = () => {
                          </div>
                     </div>
                 </div>
-                <div className="order-1 md:order-2">
+                <div className="order-1 md:order-2 px-1">
                     <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center text-blue-600 mb-6 shadow-sm">
                         <GitFork className="w-6 h-6" />
                     </div>
-                    <h2 className="text-4xl font-bold mb-4 text-gray-900">One Intelligent Route.</h2>
-                    <p className="text-lg text-gray-600 leading-relaxed max-w-lg">
+                    <h2 className="text-3xl md:text-4xl font-bold mb-3 md:mb-4 text-gray-900">One Intelligent Route.</h2>
+                    <p className="text-base md:text-lg text-gray-600 leading-relaxed max-w-lg">
                         Input your commute. We calculate the most efficient path and suggest the best stops with <span className="text-primary font-semibold">minimum detours</span>.
                     </p>
                 </div>

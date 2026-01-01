@@ -20,16 +20,16 @@ export default function LandingPage() {
   const sections = [
     (
       <div key="hero" className="w-screen h-full flex-shrink-0 flex flex-col justify-center px-6 md:px-24 relative overflow-hidden">
-          <div className="relative z-10 max-w-2xl -mt-20 md:-mt-32 pointer-events-none">
-               <h1 className="text-4xl md:text-6xl font-black text-gray-900 mb-4 md:mb-6 leading-tight">
+          <div className="relative z-10 max-w-2xl -mt-10 md:-mt-32 pointer-events-none">
+               <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-gray-900 mb-4 md:mb-6 leading-tight">
                   Drive Thru <br />
                   <span className="text-primary">Life.</span>
                </h1>
-               <p className="text-base md:text-xl text-gray-600 mb-6 md:mb-8 max-w-[280px] md:max-w-lg leading-relaxed">
+               <p className="text-sm sm:text-base md:text-xl text-gray-600 mb-6 md:mb-8 max-w-[280px] md:max-w-lg leading-relaxed">
                   The only app that syncs your errands with your route. Order coffee, groceries, and takeout for instant curbside pickup.
                </p>
-               <div className="flex gap-4 items-center pointer-events-auto">
-                  <Button size="lg" asChild className="h-12 md:h-14 px-6 md:px-8 text-base md:text-lg rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 transition-transform hover:scale-105">
+               <div className="flex gap-3 md:gap-4 items-center pointer-events-auto">
+                  <Button size="lg" asChild className="h-11 md:h-14 px-5 md:px-8 text-sm sm:text-base md:text-lg rounded-full bg-primary hover:bg-primary/90 shadow-xl shadow-primary/20 transition-transform hover:scale-105">
                       <Link href="#waitlist">Explore Thru</Link>
                   </Button>
                   <span className="text-sm font-medium text-gray-400 animate-pulse hidden md:inline-block">
