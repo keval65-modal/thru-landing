@@ -3,7 +3,7 @@ import React from 'react';
 export const ShopFronts = () => {
   return (
     // Adjusted positioning and scale for small screens to avoid overlaps
-    <div className="absolute right-0 bottom-14 sm:bottom-20 md:bottom-32 flex items-end gap-1 md:gap-2 opacity-100 z-20 origin-bottom-right transform scale-[0.48] sm:scale-[0.6] md:scale-100 pr-2 sm:pr-4 md:pr-0">
+    <div className="absolute right-0 bottom-8 sm:bottom-14 md:bottom-24 flex items-end gap-1 md:gap-2 opacity-100 z-30 origin-bottom-right transform scale-[0.48] sm:scale-[0.6] md:scale-100 pr-2 sm:pr-4 md:pr-0">
         
        {/* Shop 1: Coffee Shop (Amber/Brown) */}
        <div className="relative w-32 h-40 md:w-40 md:h-48 bg-amber-50 rounded-t-xl border-4 border-amber-900 border-b-0 flex flex-col justify-end items-center mx-2 drop-shadow-md">

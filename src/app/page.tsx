@@ -19,7 +19,7 @@ export default function LandingPage() {
   // Build sections in desired order, then duplicate to create a circular feel
   const sections = [
     (
-      <div key="hero" className="w-screen h-full flex-shrink-0 flex flex-col justify-center px-6 md:px-24 relative overflow-hidden">
+      <div key="hero" className="w-screen h-full flex-shrink-0 flex flex-col justify-center px-6 md:px-24 pb-28 sm:pb-32 relative overflow-hidden">
           <div className="relative z-10 max-w-2xl -mt-10 md:-mt-32 pointer-events-none">
                <h1 className="text-3xl sm:text-4xl md:text-6xl font-black text-gray-900 mb-4 md:mb-6 leading-tight">
                   Drive Thru <br />
