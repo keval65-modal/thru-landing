@@ -1,4 +1,5 @@
 "use client";
+// Force redeploy - C2 customer demo page
 
 import { useEffect, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";
