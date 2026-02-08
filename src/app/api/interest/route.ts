@@ -11,7 +11,8 @@ const schema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const supabaseUrl = process.env.SUPABASE_URL;
+    const supabaseUrl =
+      process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL;
     const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
     if (!supabaseUrl || !supabaseKey) {
       return NextResponse.json({ ok: false, message: 'Service misconfigured' }, { status: 500 });
