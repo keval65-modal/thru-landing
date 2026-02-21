@@ -1,7 +1,7 @@
 import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
-import Script from 'next/script';
+import { GoogleMapsScript } from "@/components/GoogleMapsScript";
 import { GoogleMapsDebug } from "@/components/demo/GoogleMapsDebug";
 
 export const metadata: Metadata = {
@@ -20,21 +20,7 @@ export default function RootLayout({
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet" />
-        <Script
-          id="google-maps-script"
-          src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
-          strategy="afterInteractive"
-          onError={(e) => {
-            console.error('Google Maps script failed to load:', e);
-          }}
-          onLoad={() => {
-            console.log('Google Maps script loaded successfully');
-            if (typeof window !== 'undefined') {
-              console.log('Current URL:', window.location.href);
-              console.log('Referrer:', document.referrer);
-            }
-          }}
-        />
+        <GoogleMapsScript />
       </head>
       <body className="font-body antialiased overscroll-none">
         <GoogleMapsDebug />
