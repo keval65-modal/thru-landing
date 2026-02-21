@@ -2,6 +2,7 @@ import type {Metadata} from 'next';
 import './globals.css';
 import { Toaster } from "@/components/ui/toaster";
 import Script from 'next/script';
+import { GoogleMapsDebug } from "@/components/demo/GoogleMapsDebug";
 
 export const metadata: Metadata = {
   title: 'Thru',
@@ -23,9 +24,20 @@ export default function RootLayout({
           id="google-maps-script"
           src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
           strategy="afterInteractive"
+          onError={(e) => {
+            console.error('Google Maps script failed to load:', e);
+          }}
+          onLoad={() => {
+            console.log('Google Maps script loaded successfully');
+            if (typeof window !== 'undefined') {
+              console.log('Current URL:', window.location.href);
+              console.log('Referrer:', document.referrer);
+            }
+          }}
         />
       </head>
       <body className="font-body antialiased overscroll-none">
+        <GoogleMapsDebug />
         {children}
         <Toaster />
       </body>
