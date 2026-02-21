@@ -37,10 +37,49 @@ export function CustomerSignUpForm() {
   
   const locationInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const [mapsLoaded, setMapsLoaded] = useState(false);
 
-  // Initialize Google Maps Autocomplete
+  // Wait for Google Maps to load
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.google?.maps?.places && locationInputRef.current) {
+    const checkMapsLoaded = () => {
+      if (typeof window !== 'undefined' && window.google?.maps?.places) {
+        setMapsLoaded(true);
+        return true;
+      }
+      return false;
+    };
+
+    // Check if already loaded
+    if (checkMapsLoaded()) {
+      return;
+    }
+
+    // Wait for script to load
+    const interval = setInterval(() => {
+      if (checkMapsLoaded()) {
+        clearInterval(interval);
+      }
+    }, 100);
+
+    // Timeout after 10 seconds
+    const timeout = setTimeout(() => {
+      clearInterval(interval);
+      if (!checkMapsLoaded()) {
+        console.warn('Google Maps Places API failed to load');
+      }
+    }, 10000);
+
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, []);
+
+  // Initialize Google Maps Autocomplete when loaded
+  useEffect(() => {
+    if (!mapsLoaded || !locationInputRef.current) return;
+
+    try {
       autocompleteRef.current = new window.google.maps.places.Autocomplete(
         locationInputRef.current,
         {
@@ -63,14 +102,25 @@ export function CustomerSignUpForm() {
           }));
         }
       });
+    } catch (error) {
+      console.error('Error initializing Google Maps Autocomplete:', error);
+      toast({
+        title: "Location service unavailable",
+        description: "Please enter your location manually.",
+        variant: "destructive",
+      });
     }
 
     return () => {
       if (autocompleteRef.current) {
-        window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        try {
+          window.google?.maps?.event?.clearInstanceListeners(autocompleteRef.current);
+        } catch (error) {
+          // Ignore cleanup errors
+        }
       }
     };
-  }, []);
+  }, [mapsLoaded, toast]);
 
   const updateField = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -79,10 +129,37 @@ export function CustomerSignUpForm() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // If location is provided but no coordinates, try to geocode it
+    if (form.location && (!form.latitude || !form.longitude)) {
+      if (mapsLoaded && window.google?.maps?.Geocoder) {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: form.location }, (results, status) => {
+          if (status === 'OK' && results?.[0]?.geometry?.location) {
+            const lat = results[0].geometry.location.lat();
+            const lng = results[0].geometry.location.lng();
+            setForm(prev => ({ ...prev, latitude: lat, longitude: lng }));
+            // Retry submit after geocoding
+            setTimeout(() => {
+              const formElement = e.target as HTMLFormElement;
+              formElement.requestSubmit();
+            }, 100);
+            return;
+          }
+        });
+      }
+      
+      toast({
+        title: "Location required",
+        description: "Please select a location from the suggestions or enter a complete address.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     if (!form.latitude || !form.longitude) {
       toast({
         title: "Location required",
-        description: "Please select a location from the suggestions.",
+        description: "Please provide a valid location.",
         variant: "destructive",
       });
       return;
