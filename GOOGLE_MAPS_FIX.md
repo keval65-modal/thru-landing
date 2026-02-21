@@ -21,7 +21,7 @@
 
 ## Resolving ApiTargetBlockedMapError
 
-The `ApiTargetBlockedMapError` is typically caused by Google Cloud Console configuration issues. Check the following:
+The `ApiTargetBlockedMapError` can be caused by several issues. If your domain (`thrulife.in`) is already in the Website restrictions, check the following:
 
 ### 1. Enable Required APIs
 In Google Cloud Console, ensure these APIs are enabled:
@@ -32,14 +32,24 @@ In Google Cloud Console, ensure these APIs are enabled:
 ### 2. Check API Key Restrictions
 1. Go to Google Cloud Console → APIs & Services → Credentials
 2. Click on your API key
-3. Check **Application restrictions**:
+3. Check **Website restrictions** (Application restrictions):
    - If set to "HTTP referrers", ensure your domain is added:
-     - `https://thru-landing-*.vercel.app/*`
+     - `https://thrulife.in/*` ✅ (already added)
+     - `https://www.thrulife.in/*` (add if you use www subdomain)
      - `http://localhost:9002/*` (for local development)
-   - Or temporarily set to "None" for testing
+     - `http://localhost:*/*` (for any local port)
+   - **Note**: Make sure the pattern matches exactly - use `https://thrulife.in/*` (with trailing slash and wildcard)
 4. Check **API restrictions**:
    - Ensure "Maps JavaScript API" and "Places API" are allowed
-   - Or set to "Don't restrict key" for testing
+   - Your current setup looks correct (5 APIs enabled including Places API)
+
+### 2b. Common Issues When Domain IS in Restrictions
+If `thrulife.in` is already in your restrictions but you still get the error:
+1. **Check the exact pattern**: Ensure it's `https://thrulife.in/*` (not `thrulife.in` without protocol)
+2. **Wait for propagation**: Changes can take up to 5 minutes
+3. **Clear browser cache**: The error might be cached
+4. **Check for www subdomain**: If you access via `www.thrulife.in`, add that pattern too
+5. **Script loading**: Ensure the script loads with proper referrer headers (fixed in code)
 
 ### 3. Verify Billing
 - Ensure billing is enabled for your Google Cloud project
