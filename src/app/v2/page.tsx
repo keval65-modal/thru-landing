@@ -27,7 +27,7 @@ import {
   getCatalog,
   vendorTypeOptions,
 } from "@/lib/demo-data";
-import { ShopOptInForm } from "@/components/demo/ShopOptInForm";
+import { VendorSignUpForm } from "@/components/demo/VendorSignUpForm";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { BrowserMultiFormatReader } from "@zxing/browser";
@@ -447,7 +447,7 @@ export default function V2VendorPage() {
           </div>
         </CardContent>
       </Card>
-      <ShopOptInForm />
+      <VendorSignUpForm />
     </main>
   );
 }

@@ -22,7 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { vendorTypeOptions, DemoOrder } from "@/lib/demo-data";
 import { useToast } from "@/hooks/use-toast";
 import { DemoState } from "@/lib/demo-sync";
-import { ShopOptInForm } from "@/components/demo/ShopOptInForm";
+import { CustomerSignUpForm } from "@/components/demo/CustomerSignUpForm";
 
 export default function C2CustomerPage() {
   const { toast } = useToast();
@@ -263,7 +263,7 @@ export default function C2CustomerPage() {
         </Card>
       </div>
 
-      <ShopOptInForm />
+      <CustomerSignUpForm />
     </main>
   );
 }
