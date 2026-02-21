@@ -1,5 +1,5 @@
 "use client";
-// Force redeploy - C2 customer demo page
+// Force redeploy - C2 customer demo page with custom sign-up form
 
 import { useEffect, useState } from "react";
 import { QRCodeCanvas } from "qrcode.react";

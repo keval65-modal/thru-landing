@@ -1,5 +1,5 @@
 "use client";
-// Force redeploy - V2 vendor demo page
+// Force redeploy - V2 vendor demo page with custom sign-up form
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
