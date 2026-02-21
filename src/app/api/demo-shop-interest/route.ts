@@ -30,6 +30,20 @@ export async function POST(req: Request) {
     const body = await req.json();
     const parsed = schema.parse(body);
 
+    // Determine source from referer to track which demo page the submission came from
+    const referer = req.headers.get("referer") || "";
+    let source = "customer-demo-panel"; // default fallback
+    
+    if (referer.includes("/v2")) {
+      source = "vendor-demo-v2";
+    } else if (referer.includes("/c2")) {
+      source = "customer-demo-c2";
+    } else if (referer.includes("/demo/vendor")) {
+      source = "vendor-demo-panel";
+    } else if (referer.includes("/demo/customer")) {
+      source = "customer-demo-panel";
+    }
+
     const { error } = await supabase.from("demo_shop_interest").insert({
       shop_name: parsed.shopName.trim(),
       owner_name: parsed.ownerName.trim(),
@@ -38,7 +52,7 @@ export async function POST(req: Request) {
       email: parsed.email?.trim() || null,
       notes: parsed.notes?.trim() || null,
       whatsapp_opt_in: parsed.whatsappOptIn,
-      source: "customer-demo-panel",
+      source: source,
       user_agent: req.headers.get("user-agent"),
     });
 
