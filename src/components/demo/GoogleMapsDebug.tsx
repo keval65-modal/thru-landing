@@ -17,14 +17,19 @@ export function GoogleMapsDebug() {
     // Check for API errors
     const originalError = console.error;
     console.error = (...args) => {
-      if (args.some(arg => typeof arg === 'string' && arg.includes('ApiTargetBlockedMapError'))) {
-        console.error('=== ApiTargetBlockedMapError Detected ===');
-        console.error('This usually means the API key restrictions don\'t match the current domain');
-        console.error('Current domain:', window.location.hostname);
-        console.error('Expected patterns in Google Cloud Console:');
-        console.error('  - https://thrulife.in/*');
-        console.error('  - https://www.thrulife.in/* (if using www)');
-        console.error('Make sure the pattern includes https:// and /* at the end');
+      // Use originalError to avoid infinite recursion
+      try {
+        if (args.some(arg => typeof arg === 'string' && arg.includes('ApiTargetBlockedMapError'))) {
+          originalError('=== ApiTargetBlockedMapError Detected ===');
+          originalError('This usually means the API key restrictions don\'t match the current domain');
+          originalError('Current domain:', window.location.hostname);
+          originalError('Expected patterns in Google Cloud Console:');
+          originalError('  - https://thrulife.in/*');
+          originalError('  - https://www.thrulife.in/* (if using www)');
+          originalError('Make sure the pattern includes https:// and /* at the end');
+        }
+      } catch (e) {
+        // Fallback if there's any error in the check
       }
       originalError.apply(console, args);
     };
