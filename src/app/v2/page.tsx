@@ -1,5 +1,5 @@
 "use client";
-// Force redeploy - V2 vendor demo page with custom sign-up form
+// V2 vendor demo page - redirects to vendor signup
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -27,7 +27,6 @@ import {
   getCatalog,
   vendorTypeOptions,
 } from "@/lib/demo-data";
-import { VendorSignUpForm } from "@/components/demo/VendorSignUpForm";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { BrowserMultiFormatReader } from "@zxing/browser";
@@ -447,7 +446,27 @@ export default function V2VendorPage() {
           </div>
         </CardContent>
       </Card>
-      <VendorSignUpForm />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Join Thru as a Vendor</CardTitle>
+          <CardDescription>
+            Register your shop to start receiving orders from customers.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Button 
+            onClick={() => window.open('https://merchant.kiptech.in/signup', '_blank')}
+            className="w-full"
+            size="lg"
+          >
+            Register Your Shop
+          </Button>
+          <p className="mt-3 text-sm text-muted-foreground">
+            Click to open the vendor registration form in a new tab.
+          </p>
+        </CardContent>
+      </Card>
     </main>
   );
 }
