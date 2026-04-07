@@ -40,8 +40,10 @@ export default function RoutePlanner({
   const mapInstance = useRef<google.maps.Map | null>(null)
   const directionsService = useRef<google.maps.DirectionsService | null>(null)
   const directionsRenderer = useRef<google.maps.DirectionsRenderer | null>(null)
-  const startAutocomplete = useRef<google.maps.places.Autocomplete | null>(null)
-  const destAutocomplete = useRef<google.maps.places.Autocomplete | null>(null)
+  const startContainerRef = useRef<HTMLDivElement>(null)
+  const destContainerRef = useRef<HTMLDivElement>(null)
+  const [placesLoaded, setPlacesLoaded] = useState(false)
+  const [forceLegacyAutocomplete, setForceLegacyAutocomplete] = useState(false)
 
   // Initialize Google Maps
   useEffect(() => {
@@ -78,44 +80,100 @@ export default function RoutePlanner({
       map: map
     })
 
-    // Initialize autocomplete
-    initializeAutocomplete()
+    // Signal that places can be initialized
+    setPlacesLoaded(true)
   }, [userLocation])
 
   // Initialize autocomplete for address inputs
-  const initializeAutocomplete = useCallback(() => {
-    if (!window.google) return
+  useEffect(() => {
+    if (!placesLoaded || !window.google) return
 
-    const startInput = document.getElementById('start-address') as HTMLInputElement
-    const destInput = document.getElementById('destination-address') as HTMLInputElement
+    const initAutocomplete = async () => {
+      if (forceLegacyAutocomplete) {
+        setupLegacyAutocomplete();
+        return;
+      }
 
-    if (startInput) {
-      startAutocomplete.current = new google.maps.places.Autocomplete(startInput, {
-        types: ['address'],
-        componentRestrictions: { country: 'in' }
-      })
+      try {
+        const { PlaceAutocompleteElement } = await google.maps.importLibrary("places") as any
+        
+        if (PlaceAutocompleteElement) {
+          if (startContainerRef.current) {
+            startContainerRef.current.innerHTML = ''
+            const startEl = new PlaceAutocompleteElement()
+            startContainerRef.current.appendChild(startEl)
+            
+            startEl.addEventListener('gmp-error', () => setForceLegacyAutocomplete(true));
+            startEl.addEventListener('gmp-placeselect', async (event: any) => {
+              const place = event.place
+              if (place) {
+                await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] })
+                setStartAddress(place.formattedAddress || "")
+                if (place.location) {
+                  onLocationUpdate({
+                    latitude: place.location.lat(),
+                    longitude: place.location.lng(),
+                    timestamp: Date.now()
+                  })
+                }
+              }
+            })
+          }
 
-      startAutocomplete.current.addListener('place_changed', () => {
-        const place = startAutocomplete.current?.getPlace()
-        if (place?.geometry?.location) {
-          const lat = place.geometry.location.lat()
-          const lng = place.geometry.location.lng()
-          onLocationUpdate({
-            latitude: lat,
-            longitude: lng,
-            timestamp: Date.now()
-          })
+          if (destContainerRef.current) {
+            destContainerRef.current.innerHTML = ''
+            const destEl = new PlaceAutocompleteElement()
+            destContainerRef.current.appendChild(destEl)
+            
+            destEl.addEventListener('gmp-error', () => setForceLegacyAutocomplete(true));
+            destEl.addEventListener('gmp-placeselect', async (event: any) => {
+              const place = event.place
+              if (place) {
+                await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] })
+                setDestinationAddress(place.formattedAddress || "")
+              }
+            })
+          }
+        } else {
+            throw new Error("No PlaceAutocompleteElement found")
         }
-      })
+      } catch (e) {
+        setForceLegacyAutocomplete(true);
+      }
     }
 
-    if (destInput) {
-      destAutocomplete.current = new google.maps.places.Autocomplete(destInput, {
-        types: ['address'],
-        componentRestrictions: { country: 'in' }
-      })
+    initAutocomplete()
+  }, [placesLoaded, onLocationUpdate, forceLegacyAutocomplete])
+
+  function setupLegacyAutocomplete() {
+    const googleObj = (window as any).google;
+    if (!googleObj?.maps?.places) return;
+
+    if (startContainerRef.current) {
+       startContainerRef.current.innerHTML = '<input id="legacy-start-planner" class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Enter start location" />';
+       const input = document.getElementById('legacy-start-planner') as HTMLInputElement;
+       const autocomplete = new googleObj.maps.places.Autocomplete(input, { fields: ['formatted_address', 'geometry'], types: ['address'], componentRestrictions: { country: 'in' } });
+       autocomplete.addListener('place_changed', () => {
+         const place = autocomplete.getPlace();
+         if (place?.formatted_address) {
+            setStartAddress(place.formatted_address);
+            if (place.geometry?.location) onLocationUpdate({ latitude: place.geometry.location.lat(), longitude: place.geometry.location.lng(), timestamp: Date.now() });
+         }
+       });
     }
-  }, [onLocationUpdate])
+
+    if (destContainerRef.current) {
+       destContainerRef.current.innerHTML = '<input id="legacy-dest-planner" class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Enter destination address" />';
+       const input = document.getElementById('legacy-dest-planner') as HTMLInputElement;
+       const autocomplete = new googleObj.maps.places.Autocomplete(input, { fields: ['formatted_address', 'geometry'], types: ['address'], componentRestrictions: { country: 'in' } });
+       autocomplete.addListener('place_changed', () => {
+         const place = autocomplete.getPlace();
+         if (place?.formatted_address) {
+            setDestinationAddress(place.formatted_address);
+         }
+       });
+    }
+  }
 
   // Calculate route
   const calculateRoute = useCallback(async () => {
@@ -256,13 +314,7 @@ export default function RoutePlanner({
               <div className="space-y-2">
                 <Label htmlFor="start-address">Start Location</Label>
                 <div className="flex gap-2">
-                  <Input
-                    id="start-address"
-                    placeholder="Enter start address"
-                    value={startAddress}
-                    onChange={(e) => setStartAddress(e.target.value)}
-                    className="flex-1"
-                  />
+                  <div ref={startContainerRef} className="flex-1" />
                   <Button
                     type="button"
                     variant="outline"
@@ -279,13 +331,7 @@ export default function RoutePlanner({
               <div className="space-y-2">
                 <Label htmlFor="destination-address">Destination</Label>
                 <div className="flex gap-2">
-                  <Input
-                    id="destination-address"
-                    placeholder="Enter destination address"
-                    value={destinationAddress}
-                    onChange={(e) => setDestinationAddress(e.target.value)}
-                    className="flex-1"
-                  />
+                  <div ref={destContainerRef} className="flex-1" />
                   <Button
                     type="button"
                     variant="outline"

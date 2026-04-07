@@ -120,6 +120,7 @@ CREATE TABLE IF NOT EXISTS vendors (
   grocery_enabled BOOLEAN DEFAULT false,
   operating_hours JSONB,
   fcm_token TEXT,
+  bank_details JSONB DEFAULT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -131,6 +132,7 @@ CREATE INDEX IF NOT EXISTS idx_vendors_location_point ON vendors USING GIST(loca
 CREATE INDEX IF NOT EXISTS idx_vendors_categories ON vendors USING GIN(categories);
 CREATE INDEX IF NOT EXISTS idx_vendors_store_type ON vendors(store_type);
 CREATE INDEX IF NOT EXISTS idx_vendors_name ON vendors(name);
+CREATE INDEX IF NOT EXISTS idx_vendors_bank_details ON vendors USING GIN(bank_details) WHERE bank_details IS NOT NULL;
 
 -- Enable RLS
 ALTER TABLE vendors ENABLE ROW LEVEL SECURITY;

@@ -12,6 +12,7 @@ export interface Vendor {
   phone?: string
   email?: string
   address?: string
+  imageUrl?: string
   location: { latitude: number; longitude: number }
   categories: string[]
   storeType?: string
@@ -330,6 +331,7 @@ export class SupabaseVendorService {
       phone: data.phone,
       email: data.email,
       address: data.address,
+      imageUrl: data.image_url,
       location: location,
       categories: data.categories || [],
       storeType: data.store_type,

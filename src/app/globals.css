@@ -128,3 +128,26 @@
   transform: translateY(-12px);
   white-space: nowrap;
 }
+
+gmpx-place-autocomplete {
+  width: 100%;
+  --gmpx-font-family: inherit;
+}
+
+gmpx-place-autocomplete::part(input) {
+  width: 100%;
+  height: 2.5rem;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background-color: transparent;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: hsl(var(--foreground));
+}
+
+gmpx-place-autocomplete::part(input):focus {
+  outline: none;
+  border-color: hsl(var(--primary));
+  box-shadow: 0 0 0 2px hsla(var(--primary), 0.2);
+}

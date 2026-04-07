@@ -15,6 +15,20 @@ const nextConfig: NextConfig = {
         port: '',
         pathname: '/**',
       },
+      // Allow Supabase storage bucket images
+      {
+        protocol: 'https',
+        hostname: '**.supabase.co',
+        port: '',
+        pathname: '/**',
+      },
+      // Allow Google-hosted images (common for places/photos)
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
 

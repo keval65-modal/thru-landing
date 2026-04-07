@@ -23,6 +23,7 @@ export interface ShopLocation {
   id: string
   name: string
   type: StoreType
+  imageUrl?: string
   coordinates: {
     lat: number
     lng: number
@@ -40,6 +41,8 @@ export interface RouteBasedShop {
   id: string
   name: string
   type: StoreType
+  imageUrl?: string
+  businessHours?: any
   coordinates: {
     lat: number
     lng: number
@@ -145,6 +148,7 @@ export class RouteBasedShopDiscovery {
             id: vendor.id,
             name: vendor.name || 'Unknown Shop',
             type: storeType, // ✅ Use the actual store_type from database
+            imageUrl: vendor.imageUrl,
             coordinates: { lat: shopLat, lng: shopLng },
             address: vendor.address || 'Address not available',
             categories: vendor.categories || [],
@@ -168,10 +172,8 @@ export class RouteBasedShopDiscovery {
 
   // Filter shops by store types
   private filterShopsByType(shops: ShopLocation[], storeTypes: StoreType[]): ShopLocation[] {
-    return shops.filter(shop => {
-      // Check if shop type is in the requested types
-      return storeTypes.includes(shop.type)
-    })
+    const normalizedRequested = new Set(storeTypes.map((s) => String(s).trim().toLowerCase()))
+    return shops.filter((shop) => normalizedRequested.has(String(shop.type).trim().toLowerCase()))
   }
 
   // Determine store type from categories
@@ -250,6 +252,7 @@ export class RouteBasedShopDiscovery {
             id: shop.id,
             name: shop.name,
             type: shop.type,
+            imageUrl: shop.imageUrl,
             coordinates: shop.coordinates,
             address: shop.address,
             categories: shop.categories,
@@ -349,6 +352,7 @@ export class RouteBasedShopDiscovery {
             id: shop.id,
             name: shop.name,
             type: shop.type,
+            imageUrl: shop.imageUrl,
             coordinates: shop.coordinates,
             address: shop.address,
             categories: shop.categories,
@@ -507,6 +511,8 @@ export class RouteBasedShopDiscovery {
       id: shop.id,
       name: shop.name,
       type: shop.type,
+      imageUrl: shop.imageUrl,
+      businessHours: shop.businessHours,
       coordinates: shop.coordinates,
       address: shop.address,
       categories: shop.categories,

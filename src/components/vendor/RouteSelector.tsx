@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Clock, MapPin, Navigation, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -26,15 +26,14 @@ export default function RouteSelector({ vendor, onRouteSet }: RouteSelectorProps
   const [startCoords, setStartCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [loadingLocation, setLoadingLocation] = useState(true);
   const [mapLoaded, setMapLoaded] = useState(false);
+  const [forceLegacyAutocomplete, setForceLegacyAutocomplete] = useState(false);
 
-  const startInputRef = useRef<HTMLInputElement>(null);
-  const destInputRef = useRef<HTMLInputElement>(null);
-  const startAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
-  const destAutocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const startContainerRef = useRef<HTMLDivElement>(null);
+  const destContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Check if Google Maps is already loaded
-    if (window.google?.maps?.places) {
+    if (window.google?.maps) {
       setMapLoaded(true);
       initAutocomplete();
     }
@@ -82,44 +81,85 @@ export default function RouteSelector({ vendor, onRouteSet }: RouteSelectorProps
     const hours = now.getHours().toString().padStart(2, '0');
     const minutes = now.getMinutes().toString().padStart(2, '0');
     setDepartureTime(`${hours}:${minutes}`);
-  }, [mapLoaded]);
+  }, [mapLoaded, forceLegacyAutocomplete]);
 
-  function initAutocomplete() {
-    if (!startInputRef.current || !destInputRef.current || !window.google?.maps?.places) return;
+  async function initAutocomplete() {
+    if (!window.google?.maps) return;
+    
+    if (forceLegacyAutocomplete) {
+      setupLegacyAutocomplete();
+      return;
+    }
 
-    // Start Location Autocomplete
-    startAutocompleteRef.current = new google.maps.places.Autocomplete(startInputRef.current, {
-      fields: ['formatted_address', 'geometry'],
-      types: ['geocode', 'establishment']
-    });
+    try {
+      const { PlaceAutocompleteElement } = await google.maps.importLibrary("places") as any;
+      
+      if (PlaceAutocompleteElement) {
+        if (startContainerRef.current) {
+          startContainerRef.current.innerHTML = '';
+          const startEl = new PlaceAutocompleteElement();
+          startContainerRef.current.appendChild(startEl);
+          startEl.addEventListener('gmp-error', () => setForceLegacyAutocomplete(true));
+          startEl.addEventListener('gmp-placeselect', async (event: any) => {
+            const place = event.place;
+            if (place) {
+              await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+              setStartLocation(place.formattedAddress || "");
+              if (place.location) setStartCoords({ lat: place.location.lat(), lng: place.location.lng() });
+            }
+          });
+        }
 
-    startAutocompleteRef.current.addListener('place_changed', () => {
-      const place = startAutocompleteRef.current?.getPlace();
-      if (place?.formatted_address && place?.geometry?.location) {
-        setStartLocation(place.formatted_address);
-        setStartCoords({
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng()
-        });
+        if (destContainerRef.current) {
+          destContainerRef.current.innerHTML = '';
+          const destEl = new PlaceAutocompleteElement();
+          destContainerRef.current.appendChild(destEl);
+          destEl.addEventListener('gmp-error', () => setForceLegacyAutocomplete(true));
+          destEl.addEventListener('gmp-placeselect', async (event: any) => {
+            const place = event.place;
+            if (place) {
+              await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+              setDestination(place.formattedAddress || "");
+              if (place.location) setDestinationCoords({ lat: place.location.lat(), lng: place.location.lng() });
+            }
+          });
+        }
+      } else {
+        throw new Error("No PlaceAutocompleteElement");
       }
-    });
+    } catch (e) {
+      setForceLegacyAutocomplete(true);
+    }
+  }
 
-    // Destination Autocomplete
-    destAutocompleteRef.current = new google.maps.places.Autocomplete(destInputRef.current, {
-      fields: ['formatted_address', 'geometry'],
-      types: ['geocode', 'establishment']
-    });
+  function setupLegacyAutocomplete() {
+    if (!window.google?.maps?.places) return;
 
-    destAutocompleteRef.current.addListener('place_changed', () => {
-      const place = destAutocompleteRef.current?.getPlace();
-      if (place?.formatted_address && place?.geometry?.location) {
-        setDestination(place.formatted_address);
-        setDestinationCoords({
-          lat: place.geometry.location.lat(),
-          lng: place.geometry.location.lng()
-        });
-      }
-    });
+    if (startContainerRef.current) {
+       startContainerRef.current.innerHTML = '<input id="legacy-start" class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Enter start location" />';
+       const input = document.getElementById('legacy-start') as HTMLInputElement;
+       const autocomplete = new google.maps.places.Autocomplete(input, { fields: ['formatted_address', 'geometry'] });
+       autocomplete.addListener('place_changed', () => {
+         const place = autocomplete.getPlace();
+         if (place?.formatted_address) {
+            setStartLocation(place.formatted_address);
+            if (place.geometry?.location) setStartCoords({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
+         }
+       });
+    }
+
+    if (destContainerRef.current) {
+       destContainerRef.current.innerHTML = '<input id="legacy-dest" class="flex h-10 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Enter destination address" />';
+       const input = document.getElementById('legacy-dest') as HTMLInputElement;
+       const autocomplete = new google.maps.places.Autocomplete(input, { fields: ['formatted_address', 'geometry'] });
+       autocomplete.addListener('place_changed', () => {
+         const place = autocomplete.getPlace();
+         if (place?.formatted_address) {
+            setDestination(place.formatted_address);
+            if (place.geometry?.location) setDestinationCoords({ lat: place.geometry.location.lat(), lng: place.geometry.location.lng() });
+         }
+       });
+    }
   }
 
   function handleMapLoad() {
@@ -151,7 +191,7 @@ export default function RouteSelector({ vendor, onRouteSet }: RouteSelectorProps
       <Script
         src={`https://maps.googleapis.com/maps/api/js?key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY}&libraries=places`}
         onLoad={handleMapLoad}
-        strategy="lazyOnload"
+        strategy="afterInteractive"
       />
 
       <div className="mb-6">
@@ -169,16 +209,8 @@ export default function RouteSelector({ vendor, onRouteSet }: RouteSelectorProps
             Start Location
           </Label>
           <div className="relative">
-            <Input
-              ref={startInputRef}
-              id="start-location"
-              type="text"
-              placeholder={loadingLocation ? "Getting location..." : "Enter start location"}
-              value={startLocation}
-              onChange={(e) => setStartLocation(e.target.value)}
-              className="pl-10"
-            />
-            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
+            <div ref={startContainerRef} className="w-full" />
+            <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 z-10 pointer-events-none">
               {loadingLocation ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
@@ -213,16 +245,7 @@ export default function RouteSelector({ vendor, onRouteSet }: RouteSelectorProps
             <MapPin className="h-4 w-4" />
             Destination
           </Label>
-          <Input
-            ref={destInputRef}
-            id="destination"
-            type="text"
-            placeholder="Enter your destination address"
-            value={destination}
-            onChange={(e) => setDestination(e.target.value)}
-            required
-            className="text-base"
-          />
+          <div ref={destContainerRef} className="w-full" />
           <p className="text-xs text-gray-500 mt-1">
             Where are you heading after picking up your order?
           </p>
