@@ -4,6 +4,7 @@ import * as React from "react";
 import { useRouter } from "next/navigation";
 import { Suspense } from "react";
 import Script from "next/script";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -45,6 +46,7 @@ import { VendorRequestPayload, AggregatedItemOffer } from "@/types/vendor-reques
 import { enhancedOrderService } from "@/lib/enhanced-order-service";
 import { routeBasedShopDiscovery, RoutePoint } from "@/lib/route-based-shop-discovery";
 import { useFoodCart } from "@/hooks/useFoodCart";
+import { getShopStatus, getTodayHours } from "@/utils/operating-hours";
 
 function HomePageContent() {
   const router = useRouter();
@@ -104,11 +106,13 @@ function HomePageContent() {
   // Google Maps states
   const [isGoogleMapsScriptLoaded, setIsGoogleMapsScriptLoaded] = React.useState(false);
   const [isFetchingCurrentLocation, setIsFetchingCurrentLocation] = React.useState(false);
+  // Force legacy autocomplete for reliable styling/value control in production.
+  const [forceLegacyAutocomplete, setForceLegacyAutocomplete] = React.useState(true);
 
   const startInputRef = React.useRef<HTMLInputElement>(null);
   const destinationInputRef = React.useRef<HTMLInputElement>(null);
-  const startAutocompleteRef = React.useRef<google.maps.places.Autocomplete | null>(null);
-  const destAutocompleteRef = React.useRef<google.maps.places.Autocomplete | null>(null);
+  const startAutocompleteContainerRef = React.useRef<HTMLDivElement>(null);
+  const destAutocompleteContainerRef = React.useRef<HTMLDivElement>(null);
 
   const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
 
@@ -135,83 +139,114 @@ function HomePageContent() {
     };
   }, [GOOGLE_MAPS_API_KEY]);
 
-  // Initialize autocomplete - FIXED to extract coordinates directly
+  // Initialize autocomplete - Robust with hard state-based fallback
   React.useEffect(() => {
-    console.log('🔧 START autocomplete effect running...');
-    console.log('  isGoogleMapsScriptLoaded:', isGoogleMapsScriptLoaded);
-    console.log('  GOOGLE_MAPS_API_KEY:', GOOGLE_MAPS_API_KEY ? 'Present' : 'Missing');
-    console.log('  startInputRef.current:', startInputRef.current ? 'Present' : 'Missing');
-    console.log('  startAutocompleteRef.current:', startAutocompleteRef.current ? 'Already initialized' : 'Not initialized');
-    
-    if (isGoogleMapsScriptLoaded && GOOGLE_MAPS_API_KEY && startInputRef.current && !startAutocompleteRef.current) {
-      try {
-        console.log('🎯 Initializing START autocomplete...');
-        startAutocompleteRef.current = new window.google.maps.places.Autocomplete(startInputRef.current);
-        
-        console.log('✅ START autocomplete created, adding listener...');
-        
-        startAutocompleteRef.current.addListener("place_changed", () => {
-          console.log('🔔 START place_changed event fired!');
-          const place = startAutocompleteRef.current?.getPlace();
-          console.log('  Place object:', place);
-          
-          if (place && place.geometry?.location) {
-            // ✅ Extract coordinates directly from the place
-            const lat = place.geometry.location.lat();
-            const lng = place.geometry.location.lng();
-            const coordString = `${lat}, ${lng}`;
-            
-            console.log('✅ START Place selected - extracted coordinates:', coordString);
-            
-            // Store ONLY coordinates for API use
-            setSelectedStartLocation(coordString);
-            // Store formatted address separately for display
-            setStartLocationQuery(place.formatted_address || place.name || coordString);
-            
-            console.log('✅ START selectedStartLocation set to:', coordString);
-            console.log('✅ START startLocationQuery set to:', place.formatted_address);
-          } else {
-            console.warn('⚠️ START place has no geometry:', place);
-          }
-        });
-        
-        console.log('✅ START autocomplete listener added');
-      } catch (error) {
-        console.error("❌ Error initializing start autocomplete:", error);
-      }
-    } else {
-      console.log('⏭️ Skipping START autocomplete initialization');
-    }
-  }, [isGoogleMapsScriptLoaded, GOOGLE_MAPS_API_KEY]);
+    if (!isGoogleMapsScriptLoaded || !GOOGLE_MAPS_API_KEY) return;
 
-  React.useEffect(() => {
-    if (isGoogleMapsScriptLoaded && GOOGLE_MAPS_API_KEY && destinationInputRef.current && !destAutocompleteRef.current) {
-      try {
-        destAutocompleteRef.current = new window.google.maps.places.Autocomplete(destinationInputRef.current);
-        destAutocompleteRef.current.addListener("place_changed", () => {
-          const place = destAutocompleteRef.current?.getPlace();
-          if (place && place.geometry?.location) {
-            // ✅ Extract coordinates directly from the place
-            const lat = place.geometry.location.lat();
-            const lng = place.geometry.location.lng();
-            const coordString = `${lat}, ${lng}`;
-            
-            console.log('✅ DEST Place selected - extracted coordinates:', coordString);
-            
-            // Store ONLY coordinates for API use
-            setSelectedDestination(coordString);
-            // Store formatted address separately for display
-            setDestinationQuery(place.formatted_address || place.name || coordString);
-            
-            console.log('✅ DEST selectedDestination set to:', coordString);
-            console.log('✅ DEST destinationQuery set to:', place.formatted_address);
-          }
-        });
-      } catch (error) {
-        console.error("Error initializing destination autocomplete:", error);
+    const initAutocomplete = async () => {
+      const googleObj = (window as any).google;
+      
+      if (forceLegacyAutocomplete) {
+        setupLegacyStart();
+        setupLegacyDest();
+        return;
       }
+
+      try {
+        const { PlaceAutocompleteElement } = await googleObj.maps.importLibrary("places");
+        
+        // Setup Start
+        if (startAutocompleteContainerRef.current) {
+          const startEl = new PlaceAutocompleteElement();
+          startAutocompleteContainerRef.current.innerHTML = '';
+          startAutocompleteContainerRef.current.appendChild(startEl);
+          
+          startEl.addEventListener('gmp-error', () => setForceLegacyAutocomplete(true));
+          startEl.addEventListener('gmp-placeselect', async (event: any) => {
+            const place = event.place;
+            if (place) {
+              await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+              const coordString = `${place.location.lat()}, ${place.location.lng()}`;
+              setSelectedStartLocation(coordString);
+              setStartLocationQuery(place.formattedAddress || place.displayName || coordString);
+            }
+          });
+        }
+
+        // Setup Dest
+        if (destAutocompleteContainerRef.current) {
+          const destEl = new PlaceAutocompleteElement();
+          destAutocompleteContainerRef.current.innerHTML = '';
+          destAutocompleteContainerRef.current.appendChild(destEl);
+          
+          destEl.addEventListener('gmp-error', () => setForceLegacyAutocomplete(true));
+          destEl.addEventListener('gmp-placeselect', async (event: any) => {
+            const place = event.place;
+            if (place) {
+              await place.fetchFields({ fields: ['displayName', 'formattedAddress', 'location'] });
+              const coordString = `${place.location.lat()}, ${place.location.lng()}`;
+              setSelectedDestination(coordString);
+              setDestinationQuery(place.formattedAddress || place.displayName || coordString);
+            }
+          });
+        }
+
+      } catch (e) {
+        console.warn('New Places API failed, using legacy fallback');
+        setForceLegacyAutocomplete(true);
+      }
+    };
+
+    const setupLegacyStart = () => {
+      const googleObj = (window as any).google;
+      if (!startAutocompleteContainerRef.current || startAutocompleteContainerRef.current.querySelector('#legacy-start-home')) return;
+      
+      // Add extra left padding (pl-9) to avoid overlapping left icon
+      startAutocompleteContainerRef.current.innerHTML = '<input id="legacy-start-home" class="flex h-10 w-full rounded-md border border-input bg-background text-foreground pl-9 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Enter start location" />';
+      const input = document.getElementById('legacy-start-home') as HTMLInputElement;
+      const autocomplete = new googleObj.maps.places.Autocomplete(input, { fields: ['formatted_address', 'geometry'] });
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place?.geometry?.location) {
+          const coordString = `${place.geometry.location.lat()}, ${place.geometry.location.lng()}`;
+          setSelectedStartLocation(coordString);
+          setStartLocationQuery(place.formatted_address || coordString);
+        }
+      });
+    };
+
+    const setupLegacyDest = () => {
+      const googleObj = (window as any).google;
+      if (!destAutocompleteContainerRef.current || destAutocompleteContainerRef.current.querySelector('#legacy-dest-home')) return;
+
+      // Add extra left padding (pl-9) to avoid overlapping left icon
+      destAutocompleteContainerRef.current.innerHTML = '<input id="legacy-dest-home" class="flex h-10 w-full rounded-md border border-input bg-background text-foreground pl-9 pr-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50" placeholder="Enter destination address" />';
+      const input = document.getElementById('legacy-dest-home') as HTMLInputElement;
+      const autocomplete = new googleObj.maps.places.Autocomplete(input, { fields: ['formatted_address', 'geometry'] });
+      autocomplete.addListener('place_changed', () => {
+        const place = autocomplete.getPlace();
+        if (place?.geometry?.location) {
+          const coordString = `${place.geometry.location.lat()}, ${place.geometry.location.lng()}`;
+          setSelectedDestination(coordString);
+          setDestinationQuery(place.formatted_address || coordString);
+        }
+      });
+    };
+
+    initAutocomplete();
+  }, [isGoogleMapsScriptLoaded, GOOGLE_MAPS_API_KEY, forceLegacyAutocomplete]);
+
+  // Keep legacy inputs in sync with state values.
+  React.useEffect(() => {
+    const startEl = document.getElementById('legacy-start-home') as HTMLInputElement | null;
+    if (startEl && startLocationQuery && startEl.value !== startLocationQuery) {
+      startEl.value = startLocationQuery;
     }
-  }, [isGoogleMapsScriptLoaded, GOOGLE_MAPS_API_KEY]);
+    const destEl = document.getElementById('legacy-dest-home') as HTMLInputElement | null;
+    if (destEl && destinationQuery && destEl.value !== destinationQuery) {
+      destEl.value = destinationQuery;
+    }
+  }, [startLocationQuery, destinationQuery, forceLegacyAutocomplete]);
 
   // Handle current location
   const handleUseCurrentLocation = async () => {
@@ -234,6 +269,9 @@ function HomePageContent() {
         
         // ALWAYS store coordinates in selectedStartLocation
         setSelectedStartLocation(coordString);
+        // Force legacy input mode so we can reflect the value visibly even when
+        // the new PlaceAutocompleteElement doesn't expose a controllable value prop.
+        setForceLegacyAutocomplete(true);
         
         // Try to get place name using reverse geocoding for DISPLAY ONLY
         if (window.google?.maps) {
@@ -255,30 +293,59 @@ function HomePageContent() {
               const placeName = results[0].formatted_address || results[0].address_components?.[0]?.long_name || 'Current Location';
               setStartLocationQuery(placeName); // Show readable name
               console.log('✅ Current location display name:', placeName);
+              setTimeout(() => {
+                const el = document.getElementById('legacy-start-home') as HTMLInputElement | null;
+                if (el) el.value = placeName;
+              }, 0);
             } else {
               // Show coordinates if geocoding fails
               setStartLocationQuery(coordString);
+              setTimeout(() => {
+                const el = document.getElementById('legacy-start-home') as HTMLInputElement | null;
+                if (el) el.value = coordString;
+              }, 0);
             }
           } catch (error) {
             console.error("Error with reverse geocoding:", error);
             // Show coordinates if geocoding fails
             setStartLocationQuery(coordString);
+            setTimeout(() => {
+              const el = document.getElementById('legacy-start-home') as HTMLInputElement | null;
+              if (el) el.value = coordString;
+            }, 0);
           }
         } else {
           // Show coordinates if Google Maps not loaded
           setStartLocationQuery(coordString);
+          setTimeout(() => {
+            const el = document.getElementById('legacy-start-home') as HTMLInputElement | null;
+            if (el) el.value = coordString;
+          }, 0);
         }
         
         setIsFetchingCurrentLocation(false);
       },
       (error) => {
         console.error("Error getting location:", error);
+        const errorMessage =
+          error.code === error.PERMISSION_DENIED
+            ? "Location permission was denied. Please allow location access in browser settings."
+            : error.code === error.POSITION_UNAVAILABLE
+            ? "Location information is unavailable right now. Try again in a moment."
+            : error.code === error.TIMEOUT
+            ? "Location request timed out. Please retry."
+            : "Please allow location access or enter manually.";
         toast({
           title: "Location access denied",
-          description: "Please allow location access or enter manually.",
+          description: errorMessage,
           variant: "destructive",
         });
         setIsFetchingCurrentLocation(false);
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
       }
     );
   };
@@ -570,7 +637,7 @@ function HomePageContent() {
     }
   }, []);
 
-  // Get place details for selected suggestion OR parse coordinates
+  // Get place details for selected suggestion OR parse coordinates OR plain address
   const getPlaceDetails = React.useCallback(async (placeIdOrCoords: string) => {
     // ✅ Check if it's coordinates in format "lat, lng"
     const coordsMatch = placeIdOrCoords.match(/^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/);
@@ -585,13 +652,38 @@ function HomePageContent() {
       };
     }
     
-    // ✅ Otherwise, treat as Google Places ID
+    // ✅ Otherwise, resolve as Place ID first, then fallback to address geocoding
     if (!window.google?.maps?.places) {
       console.warn('⚠️ Google Maps not loaded, cannot get place details');
       return null;
     }
     
     return new Promise((resolve) => {
+      const isLikelyPlaceId = /^ChI[A-Za-z0-9_-]+$/.test(placeIdOrCoords.trim());
+      const finishWithAddressGeocode = () => {
+        const geocoder = new window.google.maps.Geocoder();
+        geocoder.geocode({ address: placeIdOrCoords }, (results, status) => {
+          if (status === 'OK' && results && results[0]?.geometry?.location) {
+            resolve({
+              name: results[0].formatted_address || placeIdOrCoords,
+              address: results[0].formatted_address || placeIdOrCoords,
+              coordinates: {
+                lat: results[0].geometry.location.lat(),
+                lng: results[0].geometry.location.lng(),
+              },
+            });
+          } else {
+            resolve(null);
+          }
+        });
+      };
+
+      if (!isLikelyPlaceId) {
+        // Plain address/path text - geocode directly
+        finishWithAddressGeocode();
+        return;
+      }
+
       const service = new window.google.maps.places.PlacesService(document.createElement('div'));
       const request = {
         placeId: placeIdOrCoords,
@@ -599,17 +691,18 @@ function HomePageContent() {
       };
 
       service.getDetails(request, (place, status) => {
-        if (status === window.google.maps.places.PlacesServiceStatus.OK && place) {
+        if (status === window.google.maps.places.PlacesServiceStatus.OK && place?.geometry?.location) {
           resolve({
             name: place.name || '',
             address: place.formatted_address || '',
             coordinates: {
-              lat: place.geometry?.location?.lat() || 0,
-              lng: place.geometry?.location?.lng() || 0
+              lat: place.geometry.location.lat(),
+              lng: place.geometry.location.lng()
             }
           });
         } else {
-          resolve(null);
+          // Place ID lookup failed - fallback to address geocoding
+          finishWithAddressGeocode();
         }
       });
     });
@@ -992,6 +1085,19 @@ function HomePageContent() {
     }
   }, [selectedStartLocation, selectedDestination, departureTime]);
 
+  // Keep functionality intact: Automatically fetch user location on start if Maps API is loaded
+  React.useEffect(() => {
+    if (isGoogleMapsScriptLoaded && !selectedStartLocation && !isFetchingCurrentLocation && !startLocationQuery) {
+      handleUseCurrentLocation();
+      
+      // Auto-set as leaving now for less friction
+      if (!isImmediate && !departureTime) {
+        handleImmediateChange(true);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isGoogleMapsScriptLoaded]);
+
   return (
     <>
       {GOOGLE_MAPS_API_KEY && (
@@ -1028,401 +1134,276 @@ function HomePageContent() {
 
         <main className="flex-1 overflow-y-auto p-4 space-y-6 pb-24">
 
-          {/* Route Selection */}
-          <Card className="p-4">
-            <h2 className="text-lg font-semibold mb-4">Plan Your Route</h2>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="startLocation" className="block text-sm font-medium mb-1">Start Location</Label>
-                <div className="relative">
-                  <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground z-10" />
-                  <Input
-                    id="startLocation"
-                    ref={startInputRef}
-                    type="text"
-                    placeholder="Search or use current location"
-                    value={startLocationQuery}
-                    onChange={(e) => setStartLocationQuery(e.target.value)}
-                    className="pl-10"
-                    disabled={!isGoogleMapsScriptLoaded && !!GOOGLE_MAPS_API_KEY}
-                  />
-                </div>
-                <Button
-                  variant="link"
-                  className="p-0 h-auto text-xs mt-1 text-accent"
-                  onClick={handleUseCurrentLocation}
-                  disabled={isFetchingCurrentLocation}
-                >
-                  <LocateFixed className="mr-1 h-3 w-3"/>
-                  {isFetchingCurrentLocation ? "Fetching..." : "Use current location"}
-                </Button>
-        </div>
-
-              <div>
-                <Label htmlFor="destination" className="block text-sm font-medium mb-1">Destination</Label>
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground z-10" />
-                    <Input
-                      id="destination"
-                      ref={destinationInputRef}
-                      type="text"
-                      placeholder="Where are you heading?"
-                      value={destinationQuery}
-                      onChange={(e) => setDestinationQuery(e.target.value)}
-                      className="pl-10"
-                      disabled={!isGoogleMapsScriptLoaded && !!GOOGLE_MAPS_API_KEY}
-                    />
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    className="border-2 border-background hover:bg-muted flex-shrink-0"
-                    onClick={handleSwapLocations}
-                  >
-                    <ArrowRightLeft className="h-5 w-5 text-primary"/>
-                  </Button>
-                </div>
-              </div>
-            </div>
-            
-            <div className="mt-4">
-              <Label htmlFor="detour-slider" className="text-sm font-medium">Max Detour: {maxDetourKm} km</Label>
-              <input
-                id="detour-slider"
-                type="range"
-                min="0.5"
-                max="20"
-                step="0.5"
-                value={maxDetourKm}
-                onChange={(e) => setMaxDetourKm(parseFloat(e.target.value))}
-                className="w-full mt-2"
-              />
-            </div>
-
-            {/* Add Stops Button */}
-            <div className="mt-4 flex justify-center">
-              <Button 
-                onClick={() => setShowAddStop(true)}
-                className="flex items-center space-x-2 bg-accent hover:bg-accent/90 text-accent-foreground"
-              >
-                <PlusCircle className="h-4 w-4" />
-                <span>Add Stops</span>
-              </Button>
-            </div>
-          </Card>
-
-          {/* Add Stops Dialog */}
-          <Dialog open={showAddStop} onOpenChange={setShowAddStop}>
-            <DialogContent className="sm:max-w-md">
-              <DialogHeader>
-                <DialogTitle>Add Route Stops</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="stop-name" className="text-sm font-medium">Search for a place</Label>
+          {/* Unified Route & Planning Card */}
+          <div className="relative mb-6">
+            <Card className="p-5 shadow-[0_8px_30px_rgb(0,0,0,0.08)] border-primary/10 overflow-hidden transform transition-all duration-300">
+              <div className="space-y-6">
+                
+                {/* Where to section */}
+                <div className="relative pl-8 space-y-4">
+                  {/* Vertical connector line */}
+                  <div className="absolute left-[15px] top-[24px] bottom-[24px] w-[2px] bg-muted/60 rounded-full"></div>
+                  
+                  {/* Start Location */}
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="stop-name"
-                      placeholder="Search for places, landmarks, or addresses..."
-                      value={newStopName}
-                      onChange={(e) => setNewStopName(e.target.value)}
-                      className="pl-10"
-                    />
-                    {isLoadingSuggestions && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                    <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center">
+                      <div className="w-2.5 h-2.5 bg-primary rounded-full shadow-[0_0_0_4px_rgba(246,103,94,0.15)]"></div>
+                    </div>
+                    <div ref={startAutocompleteContainerRef} className="w-full" />
+                    {(!selectedStartLocation) && (
+                      <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+                        <LocateFixed className={cn("h-4 w-4 text-primary", isFetchingCurrentLocation ? "animate-pulse" : "")}/>
+                      </div>
                     )}
                   </div>
+
+                  {/* Destination Location */}
+                  <div className="relative">
+                    <div className="absolute -left-8 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full flex items-center justify-center">
+                      <MapPin className="h-4 w-4 text-accent z-20" />
+                    </div>
+                    <div ref={destAutocompleteContainerRef} className="w-full" />
+                  </div>
                   
-                  {/* Google Places Suggestions */}
-                  {stopSuggestions.length > 0 && (
-                    <div className="border rounded-lg bg-background shadow-sm mt-2 max-h-48 overflow-y-auto">
-                      <div className="p-2 text-sm font-medium text-muted-foreground border-b">
-                        Google Places Suggestions
-                      </div>
-                      {stopSuggestions.map((suggestion) => (
-                        <div
-                          key={suggestion.place_id}
-                          className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
-                          onClick={() => addRouteStop(suggestion)}
-                        >
-                          <div className="flex-1">
-                            <p className="font-medium">{suggestion.description}</p>
-              </div>
-                          <Button size="sm" variant="outline">
-                            Add
-                          </Button>
-            </div>
-                      ))}
-                    </div>
-                  )}
-          </div>
+                  {/* Swap Button */}
+                  <Button
+                    variant="secondary"
+                    size="icon"
+                    className="absolute -left-[30px] top-1/2 -translate-y-1/2 h-8 w-8 rounded-full shadow-sm z-10 border border-background hover:bg-muted bg-background text-muted-foreground transition-all hover:rotate-180"
+                    onClick={handleSwapLocations}
+                  >
+                    <ArrowRightLeft className="h-3.5 w-3.5 rotate-90"/>
+                  </Button>
+                </div>
 
-              <div>
-                  <Label className="text-sm font-medium">Stop Type</Label>
-                  <div className="flex space-x-2 mt-1">
-                    {[
-                      { value: 'grocery', label: 'Grocery', icon: Store },
-                      { value: 'food', label: 'Food', icon: Utensils },
-                      { value: 'other', label: 'Other', icon: MapPin }
-                    ].map((type) => (
-                      <Button
-                        key={type.value}
-                        variant={newStopType === type.value ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setNewStopType(type.value as 'grocery' | 'food' | 'other')}
-                        className="flex items-center space-x-1"
+                {/* Compact Row: Departure Time, Immediate Toggle, Stops */}
+                <div className="flex items-center gap-2 pt-2 border-t border-border/40">
+                  {/* Time Setting */}
+                  <Dialog open={showTimePicker} onOpenChange={setShowTimePicker}>
+                    <DialogTrigger asChild>
+                      <Button 
+                        variant={isImmediate ? "outline" : "default"} 
+                        className={cn(
+                          "flex-1 transition-all h-10 px-3 font-medium justify-start",
+                          isImmediate ? "bg-muted/50 text-muted-foreground" : "bg-primary text-primary-foreground shadow-sm"
+                        )}
+                        onClick={(e) => { 
+                          if (isImmediate) { 
+                            e.preventDefault(); 
+                            handleImmediateChange(false); 
+                          }
+                        }}
                       >
-                        <type.icon className="h-3 w-3" />
-                        <span>{type.label}</span>
+                        <Clock className={cn("mr-2 h-4 w-4", isImmediate ? "text-muted-foreground" : "text-primary-foreground")} />
+                        {isImmediate ? "Leaving Now" : (departureTime ? formatISTTimeOnly(departureTime) : "Set Time")}
                       </Button>
-                    ))}
-              </div>
-            </div>
-                
-                <div className="flex space-x-2">
-                  <Button onClick={() => addRouteStop()} disabled={!newStopName.trim()}>
-                    Add Stop
-                  </Button>
-                  <Button variant="outline" onClick={() => {
-                    setShowAddStop(false);
-                    setNewStopName("");
-                    setStopSuggestions([]);
-                  }}>
-                    Cancel
-                  </Button>
-          </div>
-              </div>
-            </DialogContent>
-          </Dialog>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Select Time</DialogTitle>
+                      </DialogHeader>
+                      <div className="grid grid-cols-4 gap-2 p-4">
+                        {Array.from({ length: 24 }, (_, i) => {
+                          const hour = i.toString().padStart(2, '0');
+                          return Array.from({ length: 4 }, (_, j) => {
+                            const minute = (j * 15).toString().padStart(2, '0');
+                            const time = `${hour}:${minute}`;
+                            return (
+                              <Button
+                                key={time}
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleTimeSelect(time)}
+                                className="text-xs"
+                              >
+                                {time}
+                              </Button>
+                            );
+                          });
+                        })}
+                      </div>
+                    </DialogContent>
+                  </Dialog>
 
-          {/* Route Stops List - Show only if there are stops */}
-          {routeStops.length > 0 && (
-            <Card className="p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">Your Stops ({routeStops.length})</h3>
-                <Button
-                  variant="outline"
-                  size="sm" 
-                  onClick={() => setShowAddStop(true)}
-                >
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Add More
-                </Button>
-              </div>
-              
-              <div className="space-y-2">
-                {routeStops.map((stop) => (
-                  <div key={stop.id} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                    <div className="flex items-center space-x-2">
-                      {stop.type === 'grocery' && <Store className="h-4 w-4 text-green-600" />}
-                      {stop.type === 'food' && <Utensils className="h-4 w-4 text-orange-600" />}
-                      {stop.type === 'other' && <MapPin className="h-4 w-4 text-blue-600" />}
-                      <span className="font-medium">{stop.name}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {stop.type}
-                      </Badge>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeRouteStop(stop.id)}
-                      className="text-red-500 hover:text-red-700"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  {/* Immediate Toggle */}
+                  <div 
+                    className={cn(
+                      "flex items-center space-x-2 border rounded-md px-3 h-10 cursor-pointer transition-colors shadow-sm",
+                      isImmediate ? "bg-primary/10 border-primary/30" : "bg-background border-border hover:bg-muted"
+                    )}
+                    onClick={() => handleImmediateChange(!isImmediate)}
+                  >
+                    <Checkbox
+                      id="immediate-checkbox-mini"
+                      checked={isImmediate}
+                      onCheckedChange={handleImmediateChange}
+                      className="data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+                    />
+                    <Label htmlFor="immediate-checkbox-mini" className="text-sm font-medium cursor-pointer">Now</Label>
                   </div>
-                ))}
-              </div>
-            </Card>
-          )}
 
-          {/* Departure Time Selection */}
-          <Card id="departure-time-section" className="p-4">
-            <h3 className="text-lg font-semibold mb-4">When are you leaving?</h3>
-            <div className="space-y-4">
-              {/* Immediate checkbox */}
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="immediate-checkbox"
-                  checked={isImmediate}
-                  onCheckedChange={handleImmediateChange}
-                />
-                <Label htmlFor="immediate-checkbox" className="text-sm font-medium">
-                  Leave immediately
-                </Label>
-              </div>
-
-              {/* Time selection options */}
-              {!isImmediate && (
-                <div className="space-y-4">
-                  {/* Clock picker button */}
-                  <div>
-                    <Label className="block text-sm font-medium mb-2">Select Time</Label>
-                    <Dialog open={showTimePicker} onOpenChange={setShowTimePicker}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start">
-                          <Clock className="mr-2 h-4 w-4" />
-                          {departureTime ? formatISTTimeOnly(departureTime) : "Choose time"}
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Select Time</DialogTitle>
-                        </DialogHeader>
-                        <div className="grid grid-cols-4 gap-2 p-4">
-                          {Array.from({ length: 24 }, (_, i) => {
-                            const hour = i.toString().padStart(2, '0');
-                            return Array.from({ length: 4 }, (_, j) => {
-                              const minute = (j * 15).toString().padStart(2, '0');
-                              const time = `${hour}:${minute}`;
-                      return (
-                                <Button
-                                  key={time}
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() => handleTimeSelect(time)}
-                                  className="text-xs"
+                  {/* Add Stops Toggle */}
+                  <Dialog open={showAddStop} onOpenChange={setShowAddStop}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 bg-background shadow-sm hover:bg-muted">
+                        <PlusCircle className="h-4 w-4 text-primary" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-md">
+                      <DialogHeader>
+                        <DialogTitle>Add Route Stops</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div>
+                          <Label htmlFor="stop-name" className="text-sm font-medium">Search for a place</Label>
+                          <div className="relative mt-1.5">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="stop-name"
+                              placeholder="Search for places..."
+                              value={newStopName}
+                              onChange={(e) => setNewStopName(e.target.value)}
+                              className="pl-9"
+                            />
+                            {isLoadingSuggestions && (
+                              <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-muted-foreground" />
+                            )}
+                          </div>
+                          {stopSuggestions.length > 0 && (
+                            <div className="border rounded-lg bg-background shadow-sm mt-2 max-h-48 overflow-y-auto">
+                              {stopSuggestions.map((suggestion) => (
+                                <div
+                                  key={suggestion.place_id}
+                                  className="flex items-center justify-between p-3 hover:bg-muted cursor-pointer border-b last:border-b-0"
+                                  onClick={() => addRouteStop(suggestion)}
                                 >
-                                  {time}
-                                </Button>
-                              );
-                            });
-                          })}
+                                  <p className="font-medium flex-1 text-sm truncate mr-2">{suggestion.description}</p>
+                                  <Button size="sm" variant="outline">Add</Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
+                        <div>
+                          <Label className="text-sm font-medium">Stop Type</Label>
+                          <div className="flex space-x-2 mt-1.5">
+                            {[
+                              { value: 'grocery', label: 'Grocery', icon: Store },
+                              { value: 'food', label: 'Food', icon: Utensils },
+                              { value: 'other', label: 'Other', icon: MapPin }
+                            ].map((type) => (
+                              <Button
+                                key={type.value}
+                                variant={newStopType === type.value ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setNewStopType(type.value as 'grocery' | 'food' | 'other')}
+                                className="flex items-center space-x-1"
+                              >
+                                <type.icon className="h-3 w-3" />
+                                <span>{type.label}</span>
+                              </Button>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="flex space-x-2 pt-2">
+                          <Button onClick={() => addRouteStop()} disabled={!newStopName.trim()} className="w-full">Add Stop</Button>
+                          <Button variant="outline" onClick={() => { setShowAddStop(false); setNewStopName(""); setStopSuggestions([]); }} className="w-full">Cancel</Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
 
-                  {/* Quick time options */}
-                  <div className="space-y-2">
-                    <Label className="text-sm font-medium">Quick Select</Label>
-                    <div className="grid grid-cols-3 gap-2">
-                      {quickTimeOptions.map((option) => (
-                        <Button
-                          key={option.label}
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setDepartureTime(option.value())}
-                          className="text-xs"
-                        >
-                          {option.label}
+                {/* Sub-settings: Detour slider */}
+                <div className="px-1 pt-1">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="detour-slider" className="text-xs text-muted-foreground font-medium flex items-center">
+                      <MapPin className="h-3 w-3 mr-1 opacity-70"/> Max Detour: {maxDetourKm} km
+                    </Label>
+                  </div>
+                  <input
+                    id="detour-slider"
+                    type="range"
+                    min="0.5"
+                    max="20"
+                    step="0.5"
+                    value={maxDetourKm}
+                    onChange={(e) => setMaxDetourKm(parseFloat(e.target.value))}
+                    className="w-full mt-2 h-1.5 bg-muted rounded-lg appearance-none cursor-pointer accent-primary"
+                  />
+                </div>
+
+                {/* Route Stops List - Inline */}
+                {routeStops.length > 0 && (
+                  <div className="bg-muted/30 rounded-lg p-3 space-y-2 border border-border/50">
+                    <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Added Stops ({routeStops.length})</h4>
+                    {routeStops.map((stop) => (
+                      <div key={stop.id} className="flex items-center justify-between bg-background p-2 rounded-md shadow-sm border border-border/40">
+                        <div className="flex items-center space-x-2 truncate pr-2">
+                          {stop.type === 'grocery' && <Store className="h-3.5 w-3.5 text-green-600 shrink-0" />}
+                          {stop.type === 'food' && <Utensils className="h-3.5 w-3.5 text-orange-600 shrink-0" />}
+                          {stop.type === 'other' && <MapPin className="h-3.5 w-3.5 text-blue-600 shrink-0" />}
+                          <span className="font-medium text-sm truncate">{stop.name}</span>
+                        </div>
+                        <Button variant="ghost" size="icon" onClick={() => removeRouteStop(stop.id)} className="h-6 w-6 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0">
+                          <Trash2 className="h-3.5 w-3.5" />
                         </Button>
-                      ))}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Interactive Category Selector */}
+                <div className="pt-3 border-t border-border/40">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label className="text-sm font-semibold">What do you need?</Label>
+                    {selectedStartLocation && selectedDestination && departureTime && (
+                      <div className="flex items-center space-x-1.5 text-[11px] font-semibold text-green-700 bg-green-100/80 px-2 py-0.5 rounded-full uppercase tracking-wider">
+                        <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></div>
+                        <span>Route planned</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div 
+                      className={cn(
+                        "p-3 rounded-xl border-[1.5px] cursor-pointer transition-all flex items-center gap-3",
+                        selectedCategories.includes("grocery") 
+                          ? "border-primary bg-primary/5 shadow-sm" 
+                          : "border-border/60 bg-muted/20 hover:border-primary/40 hover:bg-muted/40"
+                      )}
+                      onClick={() => handleCategoryToggle("grocery")}
+                    >
+                      <div className={cn("p-2 rounded-lg transition-colors", selectedCategories.includes("grocery") ? "bg-primary text-primary-foreground" : "bg-background text-muted-foreground shadow-sm")}>
+                        <Store className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">Grocery</div>
+                      </div>
+                    </div>
+
+                    <div 
+                      className={cn(
+                        "p-3 rounded-xl border-[1.5px] cursor-pointer transition-all flex items-center gap-3",
+                        selectedCategories.includes("food") 
+                          ? "border-accent bg-accent/5 shadow-sm" 
+                          : "border-border/60 bg-muted/20 hover:border-accent/40 hover:bg-muted/40"
+                      )}
+                      onClick={() => handleCategoryToggle("food")}
+                    >
+                      <div className={cn("p-2 rounded-lg transition-colors", selectedCategories.includes("food") ? "bg-accent text-accent-foreground" : "bg-background text-muted-foreground shadow-sm")}>
+                        <Utensils className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <div className="font-semibold text-sm">Food</div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* Add for later button */}
-                  <div>
-                    <Dialog open={showDateTimePicker} onOpenChange={setShowDateTimePicker}>
-                      <DialogTrigger asChild>
-                        <Button variant="outline" className="w-full">
-                          <Calendar className="mr-2 h-4 w-4" />
-                          Add for later
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="sm:max-w-md">
-                        <DialogHeader>
-                          <DialogTitle>Schedule for Later</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-4">
-                          <div>
-                            <Label htmlFor="date-picker" className="block text-sm font-medium mb-1">
-                              Date
-                            </Label>
-                            <Input
-                              id="date-picker"
-                              type="date"
-                              value={selectedDate}
-                              onChange={(e) => setSelectedDate(e.target.value)}
-                              min={new Date().toISOString().split('T')[0]}
-                            />
-                          </div>
-                          <div>
-                            <Label htmlFor="time-picker" className="block text-sm font-medium mb-1">
-                              Time
-                            </Label>
-                            <Input
-                              id="time-picker"
-                              type="time"
-                              value={selectedTime}
-                              onChange={(e) => setSelectedTime(e.target.value)}
-                            />
-                          </div>
-                          <Button 
-                            onClick={handleDateTimeSelect}
-                            disabled={!selectedDate || !selectedTime}
-                            className="w-full"
-                          >
-                            Set Departure Time
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  </div>
                 </div>
-              )}
 
-              {/* Selected time display */}
-              {departureTime && (
-                <div className="p-3 bg-muted rounded-lg">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4 text-primary" />
-                    <span className="text-sm font-medium">
-                      Departure: {formatISTTime(departureTime)}
-                    </span>
-                  </div>
-                </div>
-              )}
-
-              <p className="text-xs text-muted-foreground">
-                This helps us calculate the best route and timing for your stops.
-              </p>
-            </div>
-          </Card>
-
-          {/* Category Selection */}
-          <Card id="category-selection" className="p-4">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-lg font-semibold">What do you need?</h2>
-              {selectedStartLocation && selectedDestination && departureTime && (
-                <div className="flex items-center space-x-2 text-sm text-green-600">
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                  <span>Route planned!</span>
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-                          <Card 
-                  className={cn(
-                    "p-4 cursor-pointer transition-all",
-                    selectedCategories.includes("grocery") ? "ring-2 ring-primary bg-primary/5" : "hover:bg-muted"
-                  )}
-                  onClick={() => handleCategoryToggle("grocery")}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <Store className="h-8 w-8 text-primary mb-2" />
-                    <span className="font-medium">Grocery</span>
-                    <span className="text-xs text-muted-foreground">Fresh produce, essentials</span>
-                            </div>
-                          </Card>
-
-                <Card
-                  className={cn(
-                    "p-4 cursor-pointer transition-all",
-                    selectedCategories.includes("food") ? "ring-2 ring-primary bg-primary/5" : "hover:bg-muted"
-                  )}
-                  onClick={() => handleCategoryToggle("food")}
-                >
-                  <div className="flex flex-col items-center text-center">
-                    <Utensils className="h-8 w-8 text-primary mb-2" />
-                    <span className="font-medium">Food</span>
-                    <span className="text-xs text-muted-foreground">Restaurants, cafes, bakeries</span>
-                        </div>
-              </Card>
-                  </div>
+              </div>
             </Card>
+          </div>
 
             {/* Tabs for Grocery and Food */}
             <div id="grocery-food-section">
@@ -1671,19 +1652,47 @@ function HomePageContent() {
                             Refresh
                           </Button>
                         </div>
-                        {foodShops.map((shop, index) => (
-                          <Card key={shop.id || index} className="p-4 hover:shadow-md transition-shadow">
-                            <div className="flex items-start justify-between">
-                              <div className="flex-1">
+                        {foodShops.map((shop, index) => {
+                          const status = getShopStatus(shop.businessHours as any);
+                          const closedClass = status.isOpen ? "" : "opacity-60";
+                          const nextOpenText = !status.isOpen && status.nextOpenTime ? status.nextOpenTime : undefined;
+                          const todayHours = getTodayHours(shop.businessHours as any);
+                          return (
+                          <Card key={shop.id || index} className={`p-4 hover:shadow-md transition-shadow ${closedClass}`}>
+                            <div className="flex items-start gap-4 justify-between">
+                              <div className="h-24 w-24 shrink-0 overflow-hidden rounded-lg border bg-muted">
+                                <Image
+                                  src={
+                                    shop.imageUrl ||
+                                    "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><rect width='100%' height='100%' fill='%23f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%236b7280' font-size='12'>No Image</text></svg>"
+                                  }
+                                  alt={shop.name || "Shop image"}
+                                  width={96}
+                                  height={96}
+                                  className="h-full w-full object-cover"
+                                  unoptimized
+                                  onError={(e) => {
+                                    const img = e.currentTarget as HTMLImageElement;
+                                    img.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96'><rect width='100%' height='100%' fill='%23f3f4f6'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' fill='%236b7280' font-size='12'>No Image</text></svg>";
+                                  }}
+                                />
+                              </div>
+                              <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2 mb-2">
                                   <h5 className="font-semibold text-lg">{shop.name}</h5>
                                   <Badge variant="outline" className="text-xs">
                                     {shop.type}
                                   </Badge>
+                                  <Badge variant={status.isOpen ? "default" : "secondary"} className="text-xs">
+                                    {status.isOpen ? "Open" : "Closed"}
+                                  </Badge>
                                 </div>
                                 <p className="text-sm text-muted-foreground mb-2 flex items-center gap-1">
                                   <MapPin className="h-3 w-3" />
                                   {shop.address}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Hours today: {todayHours}{nextOpenText ? ` • Opens ${nextOpenText}` : ""}
                                 </p>
                                 {shop.detourDistance && (
                                   <p className="text-xs text-muted-foreground">
@@ -1707,7 +1716,7 @@ function HomePageContent() {
                               </Button>
                             </div>
                           </Card>
-                        ))}
+                        )})}
                       </div>
                     ) : (
                       <div className="text-center py-8">
